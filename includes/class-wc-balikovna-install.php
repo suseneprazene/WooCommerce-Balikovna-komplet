@@ -72,7 +72,7 @@ class WC_Balikovna_Install
     {
         global $wpdb;
 
-        $branches_table = esc_sql($wpdb->prefix . 'balikovna_branches');
+        $branches_table = $wpdb->prefix . 'balikovna_branches';
         $count = $wpdb->get_var("SELECT COUNT(*) FROM `{$branches_table}`");
 
         // If no branches exist, trigger sync
