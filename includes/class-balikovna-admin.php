@@ -223,7 +223,7 @@ class WC_Balikovna_Admin {
                 'phone' => $order->get_billing_phone()
             ),
             'package' => array(
-                'weight' => 2.5, // Default weight
+                'weight' => floatval(get_option('wc_balikovna_default_weight', '2.5')),
                 'value' => floatval($order->get_total()),
                 'cod_amount' => $order->get_payment_method() === 'cod' ? floatval($order->get_total()) : 0
             ),

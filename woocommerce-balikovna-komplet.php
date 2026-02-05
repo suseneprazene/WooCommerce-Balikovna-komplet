@@ -69,6 +69,20 @@ register_activation_hook(__FILE__, 'wc_balikovna_activate');
  */
 function wc_balikovna_activate() {
     // Vytvoř potřebné DB tabulky nebo options
-    add_option('wc_balikovna_api_token', '5e2c2954-5c9e-41c0-9854-9686c1b080eb');
-    add_option('wc_balikovna_private_key', 'l4M4p9fj1AoaKuOPyj3f0uBBB82PBCdHhYAfURzMgLnFigXcBW/pTbGxfWL/Sss1n566o+7qDpw1FZ1G5nOTlA==');
+    // Note: API credentials should be configured through plugin settings
+    // For testing purposes, you can use these test credentials:
+    // API Token: 5e2c2954-5c9e-41c0-9854-9686c1b080eb
+    // Private Key: l4M4p9fj1AoaKuOPyj3f0uBBB82PBCdHhYAfURzMgLnFigXcBW/pTbGxfWL/Sss1n566o+7qDpw1FZ1G5nOTlA==
+    
+    // Set default options if they don't exist
+    if (get_option('wc_balikovna_api_token') === false) {
+        add_option('wc_balikovna_api_token', '');
+    }
+    if (get_option('wc_balikovna_private_key') === false) {
+        add_option('wc_balikovna_private_key', '');
+    }
+    if (get_option('wc_balikovna_default_weight') === false) {
+        add_option('wc_balikovna_default_weight', '2.5');
+    }
 }
+

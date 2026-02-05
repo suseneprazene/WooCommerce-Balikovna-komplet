@@ -85,6 +85,13 @@ class WC_Balikovna_Shipping extends WC_Shipping_Method {
                 'label' => __('Povolit platbu na dobírku pro tuto metodu dopravy', 'wc-balikovna'),
                 'default' => 'yes'
             ),
+            'default_weight' => array(
+                'title' => __('Výchozí hmotnost zásilky', 'wc-balikovna'),
+                'type' => 'text',
+                'description' => __('Výchozí hmotnost zásilky v kg (použije se, pokud není nastavena u produktu)', 'wc-balikovna'),
+                'default' => get_option('wc_balikovna_default_weight', '2.5'),
+                'desc_tip' => true
+            ),
             'api_settings_title' => array(
                 'title' => __('API Nastavení', 'wc-balikovna'),
                 'type' => 'title',
@@ -141,6 +148,11 @@ class WC_Balikovna_Shipping extends WC_Shipping_Method {
      * @return bool
      */
     public function process_admin_options() {
+        // Verify nonce for security
+        if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'woocommerce-settings')) {
+            return false;
+        }
+        
         $result = parent::process_admin_options();
         
         // Update global API options
@@ -150,6 +162,10 @@ class WC_Balikovna_Shipping extends WC_Shipping_Method {
         
         if (isset($_POST['woocommerce_balikovna_private_key'])) {
             update_option('wc_balikovna_private_key', sanitize_textarea_field($_POST['woocommerce_balikovna_private_key']));
+        }
+        
+        if (isset($_POST['woocommerce_balikovna_default_weight'])) {
+            update_option('wc_balikovna_default_weight', floatval($_POST['woocommerce_balikovna_default_weight']));
         }
         
         return $result;
