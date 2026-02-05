@@ -231,10 +231,10 @@ class WC_Balikovna_Order
     {
         global $wpdb;
 
-        $hours_table = $wpdb->prefix . 'balikovna_opening_hours';
+        $hours_table = esc_sql($wpdb->prefix . 'balikovna_opening_hours');
 
         $hours = $wpdb->get_results($wpdb->prepare(
-            "SELECT day_name, open_from, open_to FROM $hours_table WHERE branch_id = %d ORDER BY id",
+            "SELECT day_name, open_from, open_to FROM `{$hours_table}` WHERE branch_id = %d ORDER BY id",
             $branch_id
         ));
 

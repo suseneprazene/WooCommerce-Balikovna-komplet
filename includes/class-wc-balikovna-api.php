@@ -94,10 +94,10 @@ class WC_Balikovna_API
         global $wpdb;
 
         $branch_id = intval($request['id']);
-        $hours_table = $wpdb->prefix . 'balikovna_opening_hours';
+        $hours_table = esc_sql($wpdb->prefix . 'balikovna_opening_hours');
 
         $hours = $wpdb->get_results($wpdb->prepare(
-            "SELECT day_name, open_from, open_to FROM $hours_table WHERE branch_id = %d ORDER BY id",
+            "SELECT day_name, open_from, open_to FROM `{$hours_table}` WHERE branch_id = %d ORDER BY id",
             $branch_id
         ));
 
@@ -145,7 +145,7 @@ class WC_Balikovna_API
     {
         global $wpdb;
 
-        $branches_table = $wpdb->prefix . 'balikovna_branches';
+        $branches_table = esc_sql($wpdb->prefix . 'balikovna_branches');
         
         // Try cache first for empty searches
         if (empty($term)) {
@@ -157,7 +157,7 @@ class WC_Balikovna_API
             }
         }
 
-        $sql = "SELECT id, name, city, city_part, address, zip, kind FROM $branches_table";
+        $sql = "SELECT id, name, city, city_part, address, zip, kind FROM `{$branches_table}`";
         $where = array();
         $params = array();
 

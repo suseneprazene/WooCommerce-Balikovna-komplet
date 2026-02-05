@@ -88,7 +88,7 @@
             }
 
             var branch = data.branch;
-            var kind = branch.kind === 'posta' ? 'pošta' : 'balíkovna';
+            var kind = branch.kind === 'posta' ? wcBalikovnaData.kindPosta : wcBalikovnaData.kindBalikovna;
 
             var $container = $(
                 '<div class="wc-balikovna-branch-item">' +
@@ -99,7 +99,7 @@
                 '</div>' +
                 '<div class="branch-address">' + branch.address + ', ' + branch.zip + '</div>' +
                 '<div class="branch-kind">' + kind + '</div>' +
-                '<div class="branch-hours-icon" data-branch-id="' + branch.id + '" title="Zobrazit otevírací hodiny">ⓘ</div>' +
+                '<div class="branch-hours-icon" data-branch-id="' + branch.id + '" title="' + wcBalikovnaData.openingHoursTitle + '">ⓘ</div>' +
                 '</div>'
             );
 
@@ -207,7 +207,7 @@
             }
 
             var $tooltip = $('#wc-balikovna-tooltip');
-            $tooltip.html('<div style="text-align: center;">Načítám...</div>');
+            $tooltip.html('<div style="text-align: center;">' + wcBalikovnaData.loadingText + '</div>');
             $tooltip.show();
 
             // Fetch opening hours
@@ -218,7 +218,7 @@
                     $tooltip.html(data);
                 },
                 error: function () {
-                    $tooltip.html('<div>Nepodařilo se načíst otevírací hodiny</div>');
+                    $tooltip.html('<div>' + wcBalikovnaData.openingHoursError + '</div>');
                 }
             });
 

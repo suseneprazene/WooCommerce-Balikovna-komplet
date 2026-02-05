@@ -74,6 +74,11 @@ class WC_Balikovna_Checkout
                 'nonce' => wp_create_nonce('wp_rest'),
                 'selectPlaceholder' => __('Začněte psát název obce nebo PSČ...', 'wc-balikovna-komplet'),
                 'validationError' => __('Vyberte prosím pobočku Balíkovny', 'wc-balikovna-komplet'),
+                'loadingText' => __('Načítám...', 'wc-balikovna-komplet'),
+                'openingHoursError' => __('Nepodařilo se načíst otevírací hodiny', 'wc-balikovna-komplet'),
+                'openingHoursTitle' => __('Zobrazit otevírací hodiny', 'wc-balikovna-komplet'),
+                'kindPosta' => __('pošta', 'wc-balikovna-komplet'),
+                'kindBalikovna' => __('balíkovna', 'wc-balikovna-komplet'),
             ));
         }
     }
@@ -144,20 +149,27 @@ class WC_Balikovna_Checkout
     public function save_branch_selection($order_id)
     {
         if (!empty($_POST['wc_balikovna_branch'])) {
-            $branch_data = json_decode(stripslashes($_POST['wc_balikovna_branch']), true);
+            // Sanitize JSON input
+            $branch_json = sanitize_text_field(wp_unslash($_POST['wc_balikovna_branch']));
+            $branch_data = json_decode($branch_json, true);
             
-            if ($branch_data) {
-                // Save branch data to order meta
-                update_post_meta($order_id, '_wc_balikovna_branch_id', sanitize_text_field($branch_data['id']));
-                update_post_meta($order_id, '_wc_balikovna_branch_name', sanitize_text_field($branch_data['name']));
-                update_post_meta($order_id, '_wc_balikovna_branch_city', sanitize_text_field($branch_data['city']));
-                update_post_meta($order_id, '_wc_balikovna_branch_city_part', sanitize_text_field($branch_data['city_part']));
-                update_post_meta($order_id, '_wc_balikovna_branch_address', sanitize_text_field($branch_data['address']));
-                update_post_meta($order_id, '_wc_balikovna_branch_zip', sanitize_text_field($branch_data['zip']));
-                update_post_meta($order_id, '_wc_balikovna_branch_kind', sanitize_text_field($branch_data['kind']));
+            if ($branch_data && is_array($branch_data)) {
+                $order = wc_get_order($order_id);
+                
+                if ($order) {
+                    // Save branch data to order meta using HPOS-compatible method
+                    $order->update_meta_data('_wc_balikovna_branch_id', sanitize_text_field($branch_data['id']));
+                    $order->update_meta_data('_wc_balikovna_branch_name', sanitize_text_field($branch_data['name']));
+                    $order->update_meta_data('_wc_balikovna_branch_city', sanitize_text_field($branch_data['city']));
+                    $order->update_meta_data('_wc_balikovna_branch_city_part', sanitize_text_field($branch_data['city_part'] ?? ''));
+                    $order->update_meta_data('_wc_balikovna_branch_address', sanitize_text_field($branch_data['address']));
+                    $order->update_meta_data('_wc_balikovna_branch_zip', sanitize_text_field($branch_data['zip']));
+                    $order->update_meta_data('_wc_balikovna_branch_kind', sanitize_text_field($branch_data['kind']));
+                    $order->save();
 
-                // Save to session for later use
-                WC()->session->set('wc_balikovna_selected_branch', $_POST['wc_balikovna_branch']);
+                    // Save to session for later use
+                    WC()->session->set('wc_balikovna_selected_branch', $branch_json);
+                }
             }
         }
     }

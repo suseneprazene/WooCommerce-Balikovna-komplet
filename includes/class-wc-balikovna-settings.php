@@ -54,8 +54,8 @@ if (!class_exists('WC_Balikovna_Settings', false)) {
             echo '<h2>' . esc_html__('Balíkovna České pošty', 'wc-balikovna-komplet') . '</h2>';
 
             // Get statistics
-            $branches_table = $wpdb->prefix . 'balikovna_branches';
-            $branches_count = $wpdb->get_var("SELECT COUNT(*) FROM $branches_table");
+            $branches_table = esc_sql($wpdb->prefix . 'balikovna_branches');
+            $branches_count = $wpdb->get_var("SELECT COUNT(*) FROM `{$branches_table}`");
             $last_sync = get_transient('wc_balikovna_branches_timestamp');
 
             echo '<table class="form-table">';
