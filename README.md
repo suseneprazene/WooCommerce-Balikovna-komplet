@@ -2,6 +2,8 @@
 
 Kompletní integrace Balíkovny pro WooCommerce s výběrem výdejního místa a tiskem štítků.
 
+> 🚀 **Chcete rychle začít?** Podívejte se na [Rychlý start průvodce](RYCHLY-START.md) (instalace za 5 minut!)
+
 ## Popis
 
 WooCommerce-Balikovna-komplet je WordPress plugin pro integraci dopravní služby Balíkovna do WooCommerce e-shopů. Plugin umožňuje zákazníkům vybrat si výdejní místo přímo během objednávání a majitelům e-shopů jednoduše vytvářet zásilky a tisknout štítky.
@@ -26,10 +28,21 @@ WooCommerce-Balikovna-komplet je WordPress plugin pro integraci dopravní služb
 
 ## Instalace
 
-1. Nahrajte složku pluginu do `/wp-content/plugins/`
-2. Aktivujte plugin v sekci 'Pluginy' ve WordPress administraci
-3. Přejděte do WooCommerce > Nastavení > Doprava
-4. Nakonfigurujte Balíkovna dopravní metodu
+### Rychlá instalace (Doporučeno)
+
+1. **Stáhněte plugin** jako ZIP soubor z GitHubu (zelené tlačítko "Code" → "Download ZIP")
+2. **Nahrajte do WordPressu**: Pluginy → Přidat nový → Nahrát plugin
+3. **Aktivujte plugin** v seznamu pluginů
+4. **Nakonfigurujte** v WooCommerce > Nastavení > Doprava
+
+📖 **[Podrobný instalační návod](INSTALACE.md)** - Kompletní průvodce s obrázky a řešením problémů
+
+### Další metody instalace
+
+- **FTP/SFTP**: Nahrajte složku `woocommerce-balikovna-komplet` do `/wp-content/plugins/`
+- **WP-CLI**: `wp plugin install https://github.com/suseneprazene/WooCommerce-Balikovna-komplet/archive/refs/heads/main.zip --activate`
+
+💡 **Tip**: Pro podrobné instrukce, řešení problémů a screenshots viz [INSTALACE.md](INSTALACE.md)
 
 ## Konfigurace
 
