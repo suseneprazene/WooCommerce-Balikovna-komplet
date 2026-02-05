@@ -129,6 +129,80 @@ if (!class_exists('WC_Balikovna_Settings', false)) {
                         'type' => 'sectionend',
                         'id' => 'balikovna_general_settings',
                     ),
+                    
+                    array(
+                        'title' => __('API nastavení České pošty', 'wc-balikovna-komplet'),
+                        'type' => 'title',
+                        'desc' => __('Přihlašovací údaje pro API České pošty pro automatické podání zásilek', 'wc-balikovna-komplet'),
+                        'id' => 'balikovna_api_settings',
+                    ),
+                    array(
+                        'title' => __('API Token', 'wc-balikovna-komplet'),
+                        'desc' => __('Token pro autentizaci v API České pošty', 'wc-balikovna-komplet'),
+                        'id' => 'wc_balikovna_api_token',
+                        'type' => 'text',
+                        'css' => 'min-width: 400px;',
+                        'desc_tip' => true,
+                    ),
+                    array(
+                        'title' => __('Privátní klíč', 'wc-balikovna-komplet'),
+                        'desc' => __('Privátní klíč pro podepisování API požadavků (Base64)', 'wc-balikovna-komplet'),
+                        'id' => 'wc_balikovna_api_private_key',
+                        'type' => 'textarea',
+                        'css' => 'min-width: 400px; min-height: 80px;',
+                        'desc_tip' => true,
+                    ),
+                    array(
+                        'type' => 'sectionend',
+                        'id' => 'balikovna_api_settings',
+                    ),
+                    
+                    array(
+                        'title' => __('Údaje odesílatele', 'wc-balikovna-komplet'),
+                        'type' => 'title',
+                        'desc' => __('Kontaktní údaje pro štítky a API', 'wc-balikovna-komplet'),
+                        'id' => 'balikovna_sender_settings',
+                    ),
+                    array(
+                        'title' => __('Jméno / Název firmy', 'wc-balikovna-komplet'),
+                        'id' => 'wc_balikovna_sender_name',
+                        'type' => 'text',
+                        'css' => 'min-width: 300px;',
+                    ),
+                    array(
+                        'title' => __('Ulice a číslo popisné', 'wc-balikovna-komplet'),
+                        'id' => 'wc_balikovna_sender_street',
+                        'type' => 'text',
+                        'css' => 'min-width: 300px;',
+                    ),
+                    array(
+                        'title' => __('Město', 'wc-balikovna-komplet'),
+                        'id' => 'wc_balikovna_sender_city',
+                        'type' => 'text',
+                        'css' => 'min-width: 300px;',
+                    ),
+                    array(
+                        'title' => __('PSČ', 'wc-balikovna-komplet'),
+                        'id' => 'wc_balikovna_sender_zip',
+                        'type' => 'text',
+                        'css' => 'min-width: 150px;',
+                    ),
+                    array(
+                        'title' => __('Telefon', 'wc-balikovna-komplet'),
+                        'id' => 'wc_balikovna_sender_phone',
+                        'type' => 'text',
+                        'css' => 'min-width: 200px;',
+                    ),
+                    array(
+                        'title' => __('Email', 'wc-balikovna-komplet'),
+                        'id' => 'wc_balikovna_sender_email',
+                        'type' => 'email',
+                        'css' => 'min-width: 300px;',
+                    ),
+                    array(
+                        'type' => 'sectionend',
+                        'id' => 'balikovna_sender_settings',
+                    ),
                 );
             }
 

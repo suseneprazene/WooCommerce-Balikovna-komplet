@@ -128,6 +128,7 @@ class WC_Balikovna_Komplet
         require_once WC_BALIKOVNA_PLUGIN_DIR . 'includes/class-wc-balikovna-checkout.php';
         require_once WC_BALIKOVNA_PLUGIN_DIR . 'includes/class-wc-balikovna-admin.php';
         require_once WC_BALIKOVNA_PLUGIN_DIR . 'includes/class-wc-balikovna-order.php';
+        require_once WC_BALIKOVNA_PLUGIN_DIR . 'includes/class-wc-balikovna-label.php';
     }
 
     /**

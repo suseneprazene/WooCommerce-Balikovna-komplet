@@ -79,6 +79,7 @@ class WC_Balikovna_Checkout
                 'openingHoursTitle' => __('Zobrazit otevírací hodiny', 'wc-balikovna-komplet'),
                 'kindPosta' => __('pošta', 'wc-balikovna-komplet'),
                 'kindBalikovna' => __('balíkovna', 'wc-balikovna-komplet'),
+                'selectedLabel' => __('Vybrané místo', 'wc-balikovna-komplet'),
             ));
         }
     }
@@ -91,33 +92,49 @@ class WC_Balikovna_Checkout
      */
     public function add_branch_selection_field($method, $index)
     {
+        // Only show for balikovna method, but NOT for address variant
         if ($method->get_method_id() !== 'balikovna') {
             return;
         }
 
         $chosen_methods = WC()->session->get('chosen_shipping_methods');
-        $chosen_shipping = $chosen_methods[0];
+        $chosen_shipping = isset($chosen_methods[0]) ? $chosen_methods[0] : '';
 
         if (strpos($chosen_shipping, 'balikovna') === false) {
             return;
         }
+        
+        // Don't show picker for address delivery
+        if (strpos($chosen_shipping, 'address') !== false) {
+            return;
+        }
 
         $selected_branch = WC()->session->get('wc_balikovna_selected_branch');
-
-        echo '<div class="wc-balikovna-branch-selection" style="margin-top: 15px;">';
-        echo '<label for="wc_balikovna_branch">' . esc_html__('Vyberte pobočku Balíkovny', 'wc-balikovna-komplet') . ' <span class="required">*</span></label>';
-        echo '<select id="wc_balikovna_branch" name="wc_balikovna_branch" class="wc-balikovna-branches" style="width: 100%;">';
+        $selected_info = '';
         
         if ($selected_branch) {
             $branch_data = json_decode($selected_branch, true);
-            if ($branch_data) {
-                echo '<option value="' . esc_attr($selected_branch) . '" selected="selected">';
-                echo esc_html($branch_data['name']);
-                echo '</option>';
+            if ($branch_data && isset($branch_data['name'])) {
+                $selected_info = sprintf(
+                    '<strong>%s:</strong> %s, %s',
+                    esc_html__('Vybrané místo', 'wc-balikovna-komplet'),
+                    esc_html($branch_data['name']),
+                    esc_html($branch_data['address'])
+                );
             }
         }
+
+        echo '<div id="balikovna_iframe_container" class="wc-balikovna-branch-selection" style="margin-top: 15px;">';
+        echo '<label>' . esc_html__('Vyberte výdejní místo Balíkovny', 'wc-balikovna-komplet') . ' <span class="required">*</span></label>';
+        echo '<iframe id="balikovna_picker" src="https://b2c.cpost.cz/locations/?type=BALIKOVNY" style="width:100%; height:500px; border:1px solid #ccc;" allow="geolocation"></iframe>';
         
-        echo '</select>';
+        if ($selected_info) {
+            echo '<div id="balikovna_selected_info" style="margin-top:10px; padding:10px; background:#f9f9f9; border:1px solid #ddd;">' . $selected_info . '</div>';
+        } else {
+            echo '<div id="balikovna_selected_info" style="margin-top:10px;"></div>';
+        }
+        
+        echo '<input type="hidden" id="balikovna_branch_data" name="balikovna_branch_data" value="' . esc_attr($selected_branch) . '">';
         echo '</div>';
     }
 
@@ -134,8 +151,9 @@ class WC_Balikovna_Checkout
 
         $chosen_shipping = $chosen_methods[0];
 
-        if (strpos($chosen_shipping, 'balikovna') !== false) {
-            if (empty($_POST['wc_balikovna_branch'])) {
+        // Only validate for balikovna (not address variant)
+        if (strpos($chosen_shipping, 'balikovna') !== false && strpos($chosen_shipping, 'address') === false) {
+            if (empty($_POST['balikovna_branch_data'])) {
                 wc_add_notice(__('Vyberte prosím pobočku Balíkovny', 'wc-balikovna-komplet'), 'error');
             }
         }
@@ -148,9 +166,9 @@ class WC_Balikovna_Checkout
      */
     public function save_branch_selection($order_id)
     {
-        if (!empty($_POST['wc_balikovna_branch'])) {
+        if (!empty($_POST['balikovna_branch_data'])) {
             // Sanitize JSON input
-            $branch_json = sanitize_text_field(wp_unslash($_POST['wc_balikovna_branch']));
+            $branch_json = sanitize_text_field(wp_unslash($_POST['balikovna_branch_data']));
             $branch_data = json_decode($branch_json, true);
             
             if ($branch_data && is_array($branch_data)) {
@@ -160,11 +178,9 @@ class WC_Balikovna_Checkout
                     // Save branch data to order meta using HPOS-compatible method
                     $order->update_meta_data('_wc_balikovna_branch_id', sanitize_text_field($branch_data['id']));
                     $order->update_meta_data('_wc_balikovna_branch_name', sanitize_text_field($branch_data['name']));
-                    $order->update_meta_data('_wc_balikovna_branch_city', sanitize_text_field($branch_data['city']));
-                    $order->update_meta_data('_wc_balikovna_branch_city_part', sanitize_text_field($branch_data['city_part'] ?? ''));
                     $order->update_meta_data('_wc_balikovna_branch_address', sanitize_text_field($branch_data['address']));
+                    $order->update_meta_data('_wc_balikovna_branch_city', sanitize_text_field($branch_data['city']));
                     $order->update_meta_data('_wc_balikovna_branch_zip', sanitize_text_field($branch_data['zip']));
-                    $order->update_meta_data('_wc_balikovna_branch_kind', sanitize_text_field($branch_data['kind']));
                     $order->save();
 
                     // Save to session for later use
