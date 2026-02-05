@@ -94,7 +94,7 @@ class WC_Balikovna_API
         global $wpdb;
 
         $branch_id = intval($request['id']);
-        $hours_table = esc_sql($wpdb->prefix . 'balikovna_opening_hours');
+        $hours_table = $wpdb->prefix . 'balikovna_opening_hours';
 
         $hours = $wpdb->get_results($wpdb->prepare(
             "SELECT day_name, open_from, open_to FROM `{$hours_table}` WHERE branch_id = %d ORDER BY id",
@@ -145,7 +145,10 @@ class WC_Balikovna_API
     {
         global $wpdb;
 
-        $branches_table = esc_sql($wpdb->prefix . 'balikovna_branches');
+        $branches_table = $wpdb->prefix . 'balikovna_branches';
+        
+        // DEBUG: Log search request
+        error_log('WC Balíkovna API: Searching branches with term: ' . ($term ? $term : '(empty)'));
         
         // Try cache first for empty searches
         if (empty($term)) {
@@ -153,6 +156,7 @@ class WC_Balikovna_API
             $cached = get_transient($cache_key);
             
             if ($cached !== false) {
+                error_log('WC Balíkovna API: Returning ' . count($cached) . ' cached branches');
                 return $cached;
             }
         }
@@ -188,7 +192,15 @@ class WC_Balikovna_API
             $sql = $wpdb->prepare($sql, $params);
         }
 
+        error_log('WC Balíkovna API: SQL query: ' . $sql);
+
         $results = $wpdb->get_results($sql, ARRAY_A);
+
+        if ($wpdb->last_error) {
+            error_log('WC Balíkovna API: SQL error: ' . $wpdb->last_error);
+        }
+
+        error_log('WC Balíkovna API: Found ' . count($results) . ' branches');
 
         if (empty($results)) {
             return array();

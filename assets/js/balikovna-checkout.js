@@ -40,12 +40,17 @@
                         };
                     },
                     processResults: function (data) {
+                        console.log('WC Balíkovna: API response:', data);
+                        
                         if (!data.branches || data.branches.length === 0) {
+                            console.warn('WC Balíkovna: No branches found');
                             return {
                                 results: []
                             };
                         }
 
+                        console.log('WC Balíkovna: Found ' + data.branches.length + ' branches');
+                        
                         return {
                             results: $.map(data.branches, function (item) {
                                 return {
@@ -63,6 +68,13 @@
                                 };
                             })
                         };
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('WC Balíkovna: AJAX error:', {
+                            status: status,
+                            error: error,
+                            response: xhr.responseText
+                        });
                     },
                     cache: true
                 },
