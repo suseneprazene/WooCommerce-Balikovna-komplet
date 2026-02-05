@@ -23,6 +23,12 @@
             var self = this;
             
             window.addEventListener('message', function(event) {
+                // Validate origin for security
+                if (event.origin !== 'https://b2c.cpost.cz') {
+                    console.warn('WC Balíkovna: Ignored message from invalid origin:', event.origin);
+                    return;
+                }
+                
                 // Handle picker result from iframe
                 if (typeof event.data === 'object' && event.data.message === 'pickerResult') {
                     const pointData = event.data.point;

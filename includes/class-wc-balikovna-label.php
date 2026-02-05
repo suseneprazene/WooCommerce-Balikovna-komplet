@@ -16,6 +16,12 @@ if (!defined('ABSPATH')) {
 class WC_Balikovna_Label
 {
     /**
+     * Default weight for parcels in grams
+     * Can be overridden via filter: apply_filters('wc_balikovna_default_weight', 1000, $order_id)
+     */
+    const DEFAULT_PARCEL_WEIGHT = 1000;
+    
+    /**
      * API endpoint for shipment operations
      */
     const SHIPMENT_ENDPOINT = 'https://online.postservis.cz/api/v1/shipments';
@@ -132,6 +138,10 @@ class WC_Balikovna_Label
         
         $current_timestamp = time();
         $auth_signature = $this->create_signature($private_key, $current_timestamp);
+        
+        if (is_wp_error($auth_signature)) {
+            return $auth_signature;
+        }
 
         $request_headers = array(
             'Authorization' => 'Bearer ' . $api_token,
@@ -211,7 +221,7 @@ class WC_Balikovna_Label
 
         $parcel_info = array(
             'reference_number' => $order_obj->get_order_number(),
-            'weight' => 1000, // Default 1kg
+            'weight' => apply_filters('wc_balikovna_parcel_weight', self::DEFAULT_PARCEL_WEIGHT, $order_obj->get_id()),
             'value' => intval($order_obj->get_total()),
             'cash_on_delivery' => $this->get_cod_amount($order_obj),
         );
@@ -240,11 +250,16 @@ class WC_Balikovna_Label
      *
      * @param string $private_key Private key
      * @param int $timestamp Current timestamp
-     * @return string Base64 encoded signature
+     * @return string|WP_Error Base64 encoded signature or error
      */
     private function create_signature($private_key, $timestamp)
     {
-        $decoded_key = base64_decode($private_key);
+        $decoded_key = base64_decode($private_key, true);
+        
+        if ($decoded_key === false || empty($decoded_key)) {
+            return new WP_Error('invalid_key', __('Privátní klíč má neplatný formát', 'wc-balikovna-komplet'));
+        }
+        
         $message_to_sign = $timestamp . ':shipments';
         $hmac_hash = hash_hmac('sha256', $message_to_sign, $decoded_key, true);
         
@@ -278,7 +293,13 @@ class WC_Balikovna_Label
      */
     private function generate_pdf_label($order_obj, $tracking_code, $is_box_delivery)
     {
-        require_once WC_BALIKOVNA_PLUGIN_DIR . 'tcpdf/tcpdf.php';
+        $tcpdf_path = WC_BALIKOVNA_PLUGIN_DIR . 'tcpdf/tcpdf.php';
+        
+        if (!file_exists($tcpdf_path)) {
+            return new WP_Error('missing_tcpdf', __('TCPDF knihovna nebyla nalezena. Zkontrolujte instalaci pluginu.', 'wc-balikovna-komplet'));
+        }
+        
+        require_once $tcpdf_path;
 
         $pdf_generator = new TCPDF('P', 'mm', 'A6', true, 'UTF-8', false);
         
@@ -313,7 +334,13 @@ class WC_Balikovna_Label
             wp_mkdir_p($label_dir);
         }
 
-        $pdf_filename = 'label-' . $order_obj->get_id() . '-' . time() . '.pdf';
+        // Generate unique filename
+        $pdf_filename = sprintf(
+            'label-%d-%s-%s.pdf',
+            $order_obj->get_id(),
+            $tracking_code,
+            wp_generate_password(8, false)
+        );
         $pdf_filepath = $label_dir . '/' . $pdf_filename;
         
         $pdf_generator->Output($pdf_filepath, 'F');

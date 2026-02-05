@@ -174,8 +174,10 @@ class WC_Balikovna_Admin
         
         // Output PDF
         if (file_exists($result['file'])) {
+            $safe_filename = sanitize_file_name('balikovna-label-' . $order_id . '.pdf');
+            
             header('Content-Type: application/pdf');
-            header('Content-Disposition: inline; filename="balikovna-label-' . $order_id . '.pdf"');
+            header('Content-Disposition: inline; filename="' . $safe_filename . '"');
             header('Content-Length: ' . filesize($result['file']));
             readfile($result['file']);
             exit;

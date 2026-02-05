@@ -126,7 +126,10 @@ class WC_Balikovna_Checkout
 
         echo '<div id="balikovna_iframe_container" class="wc-balikovna-branch-selection" style="margin-top: 15px;">';
         echo '<label>' . esc_html__('Vyberte výdejní místo Balíkovny', 'wc-balikovna-komplet') . ' <span class="required">*</span></label>';
-        echo '<iframe id="balikovna_picker" src="https://b2c.cpost.cz/locations/?type=BALIKOVNY" style="width:100%; height:500px; border:1px solid #ccc;" allow="geolocation"></iframe>';
+        
+        $iframe_url = apply_filters('wc_balikovna_picker_url', 'https://b2c.cpost.cz/locations/?type=BALIKOVNY');
+        
+        echo '<iframe id="balikovna_picker" src="' . esc_url($iframe_url) . '" style="width:100%; height:500px; border:1px solid #ccc;" allow="geolocation" onerror="console.error(\'WC Balíkovna: Iframe failed to load\')"></iframe>';
         
         if ($selected_info) {
             echo '<div id="balikovna_selected_info" style="margin-top:10px; padding:10px; background:#f9f9f9; border:1px solid #ddd;">' . $selected_info . '</div>';
