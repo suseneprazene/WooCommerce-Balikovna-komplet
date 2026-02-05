@@ -1,0 +1,213 @@
+.container {
+  width: 740px;
+  margin: auto;
+  font-family: Verdana;
+  font-size: 12px;
+  color: #304385;
+
+  a {
+    color: #304385;
+
+    &:hover {
+      color: #8c5f00;
+    }
+  }
+
+  hr {
+    margin: 20px 0;
+    border: none;
+    background: #cccccc;
+    height: 1px
+  }
+
+  .links {
+    margin-top: 10px;
+    margin-bottom: 10px;
+
+    .col {
+      display: inline-block;
+      text-align: center;
+      width: 100%;
+
+      &.left {
+        text-align: left;
+      }
+
+      &.right {
+        text-align: right;
+      }
+    }
+  }
+
+  .main {
+    width: 700px;
+    margin: auto;
+    border: 1px solid #b3b3b3;
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-top: 20px;
+    padding-bottom: 10px;
+    overflow: auto;
+
+    .logos {
+      height: 65px;
+
+      #mainLogo {
+        float: left;
+      }
+
+      #secondaryLogo {
+        float: right;
+      }
+    }
+
+    .search {
+      .label {
+        margin-bottom: 15px;
+      }
+    }
+
+    .confirm {
+      margin-top: 10px;
+
+      form {
+        display: none;
+        float: right;
+      }
+    }
+  }
+
+}
+
+.selectItem {
+  .item {
+    float: left;
+    color: #535353;
+    font-size: 11px;
+    margin-right: 5px;
+    overflow: hidden;
+  }
+
+  .city {
+    @extend .item;
+    width: 100px;
+  }
+
+  .cityPart {
+    @extend .item;
+    width: 110px;
+  }
+
+  .address {
+    @extend .item;
+    width: 358px;
+  }
+
+  .openingHours {
+    background: url("../images/ico_7.gif");
+    width: 21px;
+    height: 21px;
+    float: right;
+    margin-right: 15px;
+  }
+
+  .kind {
+    @extend .item;
+    width: 40px;
+    float: right;
+  }
+
+  &.select2-results__option--highlighted {
+    background-color: #2f4581 !important;
+  }
+
+  &.select2-results__option--highlighted {
+    div {
+      color: white;
+    }
+  }
+}
+
+.select2-selection__choice {
+  @extend .selectItem;
+  background: none !important;
+  border: none !important;
+  width: 700px !important;
+  font-size: 11px !important;
+}
+
+.select2-selection--single {
+  @extend .selectItem;
+
+  font-size: 11px !important;
+
+  .openingHours {
+    margin-top: 3px;
+  }
+}
+
+.select2-container {
+  width: 700px !important;
+
+  .select2-selection {
+    border-radius: 0 !important;
+    border: 1px solid #2f4581 !important;
+  }
+
+  .select2-dropdown {
+
+    .select2-results {
+      li {
+        height: 30px !important;
+        border-bottom: 1px solid #b3b3b3 !important;
+
+        @extend .selectItem;
+      }
+
+    }
+  }
+
+}
+
+.select2-results__message {
+  color: #304385;
+  font-size: 12px;
+  font-family: Verdana;
+}
+
+.select2-results__option {
+  padding: 6px;
+  font-family: Verdana;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#tooltip {
+  position:absolute;
+  left:0px;
+  top:-1000px;
+  z-index:100000;
+  background: white;
+  border: 1px solid #314584;
+  color: #000;
+  font-size: 10px;
+  padding: 10px;
+  max-width: 250px;
+  text-align: left;
+  line-height: 1.3;
+  font-family: Verdana
+}
+
+input[type='submit'] {
+  border: 1px solid #2f4581;
+  height: 24px;
+  background-color: #fecf43;
+  cursor: pointer;
+  color: #2f4581;
+  font-family: Tahoma;
+  font-size: 11px;
+  width: 60px;
+  text-align: center;
+}

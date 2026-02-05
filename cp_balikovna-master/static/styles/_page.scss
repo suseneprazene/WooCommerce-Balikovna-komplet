@@ -1,0 +1,24 @@
+.days {
+  .dayName {
+    display: inline;
+    float: left;
+    width: 45px;
+    font-weight: bold;
+  }
+
+  .from {
+    display: inline;
+  }
+
+  .sep {
+    display: inline;
+  }
+
+  .to {
+    display: inline;
+
+    &:not(:last-of-type) {
+      margin-right: 10px;
+    }
+  }
+}

@@ -1,0 +1,12 @@
+<div class="days">
+    {% for day, hours in days %}
+        <div class="day">
+            <div class="dayName">{{ day }}</div>
+            {% for hour in hours %}
+                <div class="from">{{ hour.from }}</div>
+                <div class="sep"> - </div>
+                <div class="to">{{ hour.to }}</div>
+            {% endfor %}
+        </div>
+    {% endfor %}
+</div>

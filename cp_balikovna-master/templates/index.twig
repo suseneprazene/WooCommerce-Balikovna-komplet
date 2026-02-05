@@ -1,0 +1,51 @@
+{% extends "_base.twig" %}
+
+{% block content %}
+    <div class="links">
+        <!--<div class="col left">
+            <a href="#">Manuál pro implementaci</a>
+        </div>-->
+        <div class="col">
+            <a href="cp_balikovna-master.zip" target="_blank">Zdrojové soubory</a>
+        </div>
+        <!--<div class="col right">
+            <a href="#">Změnová dokumentace</a>
+        </div>-->
+    </div>
+    <div class="main">
+        <div class="logos">
+            <img id="mainLogo" src="images/logo.png" alt="Logo">
+            <img id="secondaryLogo" src="images/balik.png" height="49px" alt="Balík Na poštu">
+        </div>
+        <div class="about">
+            Vyzvednutí balíku v síti Balíkoven s rychlejším odbavením a možností platby kartou.
+        </div>
+        <hr>
+        <div class="search">
+            <div class="label">Zadejte název nebo PSČ obce, ve které si přejete zásilku vyzvednout na pobočce ČP.</div>
+            <select class="branches">
+                <option></option>
+                {#{% for branch in branches %}#}
+                    {#<option value="{{ branch.id }}"#}
+                            {#data-id="{{ branch.id }}"#}
+                            {#data-name="{{ branch.name }}"#}
+                            {#data-city="{{ branch.city }}"#}
+                            {#data-city-part="{{ branch.city_part }}"#}
+                            {#data-address="{{ branch.address }}"#}
+                            {#data-zip="{{ branch.zip }}"#}
+                            {#data-kind="{{ branch.kind }}">#}
+                        {#{{ branch.name }}#}
+                    {#</option>#}
+                {#{% endfor %}#}
+            </select>
+        </div>
+        <div class="confirm">
+            <form id="callbackForm">
+                <input type="hidden" name="branchId" value="">
+                <input type="submit" value="Potvrdit">
+            </form>
+        </div>
+    </div>
+
+    <div id="tooltip"></div>
+{% endblock %}
