@@ -69,10 +69,8 @@ register_activation_hook(__FILE__, 'wc_balikovna_activate');
  */
 function wc_balikovna_activate() {
     // Vytvoř potřebné DB tabulky nebo options
-    // Note: API credentials should be configured through plugin settings
-    // For testing purposes, you can use these test credentials:
-    // API Token: 5e2c2954-5c9e-41c0-9854-9686c1b080eb
-    // Private Key: l4M4p9fj1AoaKuOPyj3f0uBBB82PBCdHhYAfURzMgLnFigXcBW/pTbGxfWL/Sss1n566o+7qDpw1FZ1G5nOTlA==
+    // IMPORTANT: API credentials MUST be configured through WooCommerce > Settings > Shipping > Balíkovna
+    // WARNING: Never commit real production API credentials to version control
     
     // Set default options if they don't exist
     if (get_option('wc_balikovna_api_token') === false) {
