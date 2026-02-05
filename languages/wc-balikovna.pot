@@ -1,0 +1,186 @@
+# Copyright (C) 2024 WooCommerce-Balikovna-komplet
+# This file is distributed under the same license as the WooCommerce-Balikovna-komplet package.
+msgid ""
+msgstr ""
+"Project-Id-Version: WooCommerce-Balikovna-komplet 1.0.0\n"
+"Report-Msgid-Bugs-To: https://github.com/suseneprazene/WooCommerce-Balikovna-komplet\n"
+"POT-Creation-Date: 2024-01-01 00:00:00+0000\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language-Team: Czech\n"
+
+#: woocommerce-balikovna-komplet.php
+msgid "WooCommerce-Balikovna-komplet vyžaduje aktivní WooCommerce plugin."
+msgstr ""
+
+#: includes/class-balikovna-api.php
+msgid "API request failed"
+msgstr ""
+
+#: includes/class-balikovna-shipping.php
+msgid "Balíkovna"
+msgstr ""
+
+msgid "Doprava přes výdejní místa Balíkovny"
+msgstr ""
+
+msgid "Zapnout/vypnout"
+msgstr ""
+
+msgid "Zapnout metodu dopravy Balíkovna"
+msgstr ""
+
+msgid "Název"
+msgstr ""
+
+msgid "Cena dopravy"
+msgstr ""
+
+msgid "Doprava zdarma od"
+msgstr ""
+
+msgid "Povolit dobírku"
+msgstr ""
+
+#: includes/class-balikovna-order.php
+msgid "Prosím vyberte výdejní místo Balíkovny."
+msgstr ""
+
+msgid "Balíkovna - Výdejní místo"
+msgstr ""
+
+msgid "ID pobočky:"
+msgstr ""
+
+msgid "Název:"
+msgstr ""
+
+msgid "Adresa:"
+msgstr ""
+
+msgid "ID zásilky:"
+msgstr ""
+
+msgid "Tracking číslo:"
+msgstr ""
+
+msgid "Výdejní místo Balíkovna:"
+msgstr ""
+
+msgid "Výdejní místo Balíkovna"
+msgstr ""
+
+#: includes/class-balikovna-admin.php
+msgid "Opravdu chcete zrušit tuto zásilku?"
+msgstr ""
+
+msgid "Vytváření zásilky..."
+msgstr ""
+
+msgid "Stahuji štítek..."
+msgstr ""
+
+msgid "Ruším zásilku..."
+msgstr ""
+
+msgid "Chyba"
+msgstr ""
+
+msgid "Úspěch"
+msgstr ""
+
+msgid "Vybrat"
+msgstr ""
+
+msgid "Načítání..."
+msgstr ""
+
+msgid "Nenalezeny žádné pobočky"
+msgstr ""
+
+msgid "Chyba při vyhledávání"
+msgstr ""
+
+msgid "Balíkovna - Zásilka"
+msgstr ""
+
+msgid "Výdejní místo nebylo vybráno"
+msgstr ""
+
+msgid "Vytvořit zásilku"
+msgstr ""
+
+msgid "Stáhnout štítek"
+msgstr ""
+
+msgid "Zrušit zásilku"
+msgstr ""
+
+msgid "Nedostatečná oprávnění"
+msgstr ""
+
+msgid "Chybné ID objednávky"
+msgstr ""
+
+msgid "Objednávka nenalezena"
+msgstr ""
+
+msgid "Zásilka byla úspěšně vytvořena"
+msgstr ""
+
+msgid "Zásilka nebyla vytvořena"
+msgstr ""
+
+msgid "Zásilka byla zrušena"
+msgstr ""
+
+msgid "Balíkovna - Vytvořit zásilky"
+msgstr ""
+
+msgid "Balíkovna - Stáhnout štítky"
+msgstr ""
+
+#: includes/class-balikovna-label-generator.php
+msgid "Odesílatel:"
+msgstr ""
+
+msgid "Příjemce:"
+msgstr ""
+
+msgid "Výdejní místo:"
+msgstr ""
+
+msgid "Objednávka:"
+msgstr ""
+
+msgid "Číslo:"
+msgstr ""
+
+msgid "Hodnota:"
+msgstr ""
+
+msgid "Dobírka:"
+msgstr ""
+
+msgid "Nepodařilo se uložit štítek"
+msgstr ""
+
+msgid "Žádné objednávky"
+msgstr ""
+
+#: templates/branch-selector.php
+msgid "Vyberte výdejní místo Balíkovna"
+msgstr ""
+
+msgid "Zadejte PSČ nebo město"
+msgstr ""
+
+msgid "Hledat"
+msgstr ""
+
+msgid "Načítání výdejních míst..."
+msgstr ""
+
+msgid "Vybrané výdejní místo:"
+msgstr ""

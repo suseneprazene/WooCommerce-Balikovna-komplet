@@ -1,0 +1,70 @@
+/**
+ * Balíkovna Admin Styles
+ */
+
+.balikovna-metabox {
+    padding: 10px 0;
+}
+
+.balikovna-metabox .form-field {
+    margin-bottom: 10px;
+}
+
+.balikovna-metabox button {
+    width: 100%;
+    margin-bottom: 5px;
+}
+
+.balikovna-metabox p {
+    margin: 5px 0;
+}
+
+#balikovna-metabox-messages {
+    margin-top: 10px;
+}
+
+#balikovna-metabox-messages .error,
+#balikovna-metabox-messages .updated {
+    padding: 10px;
+    margin: 10px 0;
+}
+
+.balikovna-order-info {
+    margin-top: 10px;
+    padding: 10px;
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.balikovna-order-info h3 {
+    margin-top: 0;
+    font-size: 14px;
+    color: #333;
+}
+
+.balikovna-order-info p {
+    margin: 5px 0;
+    font-size: 13px;
+}
+
+.balikovna-order-info strong {
+    color: #0073aa;
+}
+
+/* Admin settings page */
+.woocommerce_balikovna_settings {
+    max-width: 800px;
+}
+
+/* Bulk actions feedback */
+.balikovna-bulk-notice {
+    margin: 10px 0;
+    padding: 10px 15px;
+    background: #fff;
+    border-left: 4px solid #46b450;
+}
+
+.balikovna-bulk-notice.error {
+    border-left-color: #dc3232;
+}

@@ -1,0 +1,178 @@
+/**
+ * Balíkovna Frontend Styles
+ */
+
+.balikovna-branch-selector {
+    margin: 20px 0;
+    padding: 20px;
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.balikovna-branch-selector h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 18px;
+    color: #333;
+}
+
+.branch-search {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.branch-search input[type="text"] {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.branch-search button {
+    padding: 10px 20px;
+    background: #0073aa;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.branch-search button:hover {
+    background: #005177;
+}
+
+.branch-list-container {
+    position: relative;
+    min-height: 100px;
+}
+
+#branch-loading {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+}
+
+.branches-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.branch-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    margin-bottom: 10px;
+    background: #fff;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.branch-item:hover {
+    border-color: #0073aa;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.branch-item.selected {
+    border-color: #46b450;
+    background: #f0f9f1;
+}
+
+.branch-info {
+    flex: 1;
+}
+
+.branch-name {
+    display: block;
+    font-size: 16px;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.branch-address {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.branch-hours {
+    font-size: 12px;
+    color: #999;
+}
+
+.branch-item-select {
+    padding: 8px 15px;
+    background: #0073aa;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.branch-item-select:hover {
+    background: #005177;
+}
+
+.branch-item.selected .branch-item-select {
+    background: #46b450;
+}
+
+.selected-branch-info {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f0f9f1;
+    border: 2px solid #46b450;
+    border-radius: 4px;
+}
+
+.selected-branch-info h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.selected-branch-info p {
+    margin: 0;
+}
+
+.no-results,
+.error {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+}
+
+.error {
+    color: #dc3232;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .branch-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .branch-item-select {
+        margin-top: 10px;
+        width: 100%;
+    }
+    
+    .branch-search {
+        flex-direction: column;
+    }
+    
+    .branch-search button {
+        width: 100%;
+    }
+}
