@@ -177,7 +177,7 @@ class WC_Balikovna_Install
             $branches_count++;
 
             // Log progress every 100 branches
-            if ($branches_count % 100 == 0) {
+            if ($branches_count % 100 === 0) {
                 error_log('Zpracováno ' . $branches_count . ' / ' . $total_items . ' poboček...');
             }
 
