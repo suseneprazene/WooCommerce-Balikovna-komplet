@@ -174,6 +174,12 @@ class WC_Balikovna_Admin
         
         // Output PDF
         if (file_exists($result['file'])) {
+            // Validate order ID is numeric
+            $order_id = absint($order_id);
+            if ($order_id === 0) {
+                wp_die(__('Neplatné ID objednávky', 'wc-balikovna-komplet'));
+            }
+            
             $safe_filename = sanitize_file_name('balikovna-label-' . $order_id . '.pdf');
             
             header('Content-Type: application/pdf');

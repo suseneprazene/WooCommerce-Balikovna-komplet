@@ -23,8 +23,10 @@
             var self = this;
             
             window.addEventListener('message', function(event) {
-                // Validate origin for security
-                if (event.origin !== 'https://b2c.cpost.cz') {
+                // Validate origin for security (configurable for testing)
+                var allowedOrigin = wcBalikovnaData.allowedOrigin || 'https://b2c.cpost.cz';
+                
+                if (event.origin !== allowedOrigin) {
                     console.warn('WC Balíkovna: Ignored message from invalid origin:', event.origin);
                     return;
                 }

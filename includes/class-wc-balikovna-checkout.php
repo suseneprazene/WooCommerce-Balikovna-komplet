@@ -80,6 +80,7 @@ class WC_Balikovna_Checkout
                 'kindPosta' => __('pošta', 'wc-balikovna-komplet'),
                 'kindBalikovna' => __('balíkovna', 'wc-balikovna-komplet'),
                 'selectedLabel' => __('Vybrané místo', 'wc-balikovna-komplet'),
+                'allowedOrigin' => 'https://b2c.cpost.cz',
             ));
         }
     }

@@ -2,6 +2,9 @@
 /**
  * Label generation and shipment handling for Czech Post API
  *
+ * Requires TCPDF library to be installed at: {plugin_dir}/tcpdf/tcpdf.php
+ * The library is bundled with the plugin and should be automatically available.
+ * 
  * @package WC_Balikovna_Komplet
  */
 
@@ -335,10 +338,11 @@ class WC_Balikovna_Label
         }
 
         // Generate unique filename
+        $safe_tracking = sanitize_file_name($tracking_code);
         $pdf_filename = sprintf(
             'label-%d-%s-%s.pdf',
             $order_obj->get_id(),
-            $tracking_code,
+            $safe_tracking,
             wp_generate_password(8, false)
         );
         $pdf_filepath = $label_dir . '/' . $pdf_filename;
