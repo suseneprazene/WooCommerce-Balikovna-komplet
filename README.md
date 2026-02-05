@@ -35,11 +35,19 @@ WooCommerce-Balikovna-komplet je WordPress plugin pro integraci dopravní služb
 
 ### API přihlašovací údaje
 
-Plugin je předkonfigurován s testovacími API přihlašovacími údaji:
+Po aktivaci pluginu je nutné nastavit API přihlašovací údaje:
+
+1. Přejděte do **WooCommerce > Nastavení > Doprava**
+2. Vyberte dopravní zónu a najděte metodu **Balíkovna**
+3. V nastavení metody zadejte:
+   - **API Token:** Váš API token z Balíkovny
+   - **Private Key:** Váš soukromý klíč z Balíkovny
+
+**Pro testování můžete použít tyto testovací údaje:**
 - **API Token:** `5e2c2954-5c9e-41c0-9854-9686c1b080eb`
 - **Private Key:** `l4M4p9fj1AoaKuOPyj3f0uBBB82PBCdHhYAfURzMgLnFigXcBW/pTbGxfWL/Sss1n566o+7qDpw1FZ1G5nOTlA==`
 
-Pro produkční použití nahraďte tyto údaje svými skutečnými API klíči.
+⚠️ **Pro produkční použití musíte nahradit tyto údaje svými skutečnými API klíči získanými od Balíkovny.**
 
 ### Nastavení dopravní metody
 
@@ -50,6 +58,8 @@ Pro produkční použití nahraďte tyto údaje svými skutečnými API klíči.
    - Název (např. "Výdejní místo Balíkovna")
    - Cenu dopravy
    - Částku pro dopravu zdarma (volitelné)
+   - Výchozí hmotnost zásilky (v kg)
+   - API Token a Private Key
    - Povolit/zakázat dobírku
 
 ## Použití
