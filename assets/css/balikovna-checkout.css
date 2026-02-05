@@ -1,0 +1,200 @@
+/**
+ * WooCommerce Balikovna Checkout Styles
+ */
+
+/* Branch selection container */
+.wc-balikovna-branch-selection {
+    margin-top: 15px;
+    padding: 15px;
+    background: #f8f8f8;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.wc-balikovna-branch-selection label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #333;
+}
+
+/* Branch item in dropdown */
+.wc-balikovna-branch-item {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    position: relative;
+}
+
+.wc-balikovna-branch-item:last-child {
+    border-bottom: none;
+}
+
+.wc-balikovna-branch-item .branch-name {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.wc-balikovna-branch-item .branch-details {
+    font-size: 0.9em;
+    color: #666;
+    margin-bottom: 3px;
+}
+
+.wc-balikovna-branch-item .branch-address {
+    font-size: 0.85em;
+    color: #888;
+    margin-bottom: 3px;
+}
+
+.wc-balikovna-branch-item .branch-kind {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #0073aa;
+    color: #fff;
+    font-size: 0.75em;
+    border-radius: 3px;
+    text-transform: uppercase;
+    margin-top: 5px;
+}
+
+.wc-balikovna-branch-item .branch-hours-icon {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 20px;
+    height: 20px;
+    background: #0073aa;
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: help;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.wc-balikovna-branch-item .branch-hours-icon:hover {
+    background: #005177;
+}
+
+/* Select2 customization */
+.select2-container--default .select2-results__option--highlighted[aria-selected] {
+    background-color: #0073aa;
+}
+
+.select2-container .select2-search--inline .select2-search__field {
+    margin-top: 5px;
+}
+
+/* Tooltip styles */
+#wc-balikovna-tooltip {
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+
+#wc-balikovna-tooltip .balikovna-opening-hours {
+    min-width: 200px;
+}
+
+#wc-balikovna-tooltip .day-hours {
+    margin-bottom: 5px;
+    padding: 3px 0;
+}
+
+#wc-balikovna-tooltip .day-hours strong {
+    display: inline-block;
+    min-width: 80px;
+    color: #333;
+}
+
+/* Error message */
+.wc-balikovna-error {
+    color: #e2401c;
+    font-size: 0.9em;
+    margin-top: 5px;
+    display: block;
+}
+
+/* Order details - Balikovna info */
+.woocommerce-balikovna-details {
+    margin-top: 20px;
+    padding: 20px;
+    background: #f8f8f8;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.woocommerce-balikovna-details h2 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+    color: #333;
+}
+
+.woocommerce-balikovna-details address {
+    font-style: normal;
+    line-height: 1.6;
+}
+
+/* Admin order meta box */
+.wc-balikovna-order-info p {
+    margin-bottom: 10px;
+}
+
+.wc-balikovna-order-info strong {
+    color: #333;
+}
+
+.wc-balikovna-opening-hours details {
+    margin-top: 10px;
+}
+
+.wc-balikovna-opening-hours summary {
+    color: #0073aa;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+}
+
+.wc-balikovna-opening-hours summary:hover {
+    color: #005177;
+}
+
+/* Responsive styles */
+@media screen and (max-width: 768px) {
+    .wc-balikovna-branch-item .branch-hours-icon {
+        position: static;
+        margin-top: 8px;
+        margin-right: 5px;
+    }
+
+    #wc-balikovna-tooltip {
+        max-width: 90vw !important;
+        font-size: 0.85em;
+    }
+}
+
+/* Loading state */
+.wc-balikovna-branches.select2-hidden-accessible + .select2-container .select2-selection--single {
+    min-height: 38px;
+}
+
+.wc-balikovna-branches.select2-hidden-accessible + .select2-container .select2-selection__rendered {
+    line-height: 38px;
+}
+
+/* Email styles (inline will be better, but this is for reference) */
+.woocommerce-balikovna-email-details {
+    margin-bottom: 20px;
+    padding: 12px;
+    background-color: #f8f8f8;
+    border: 1px solid #ddd;
+}
+
+.woocommerce-balikovna-email-details h2 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 18px;
+}
