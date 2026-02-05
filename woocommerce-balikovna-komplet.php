@@ -69,8 +69,31 @@ class WC_Balikovna_Komplet
      */
     public function __construct()
     {
+        // Declare compatibility BEFORE WooCommerce initializes
+        add_action('before_woocommerce_init', array($this, 'declare_compatibility'));
+        
+        // Hook into plugins_loaded to ensure WooCommerce is loaded first
+        add_action('plugins_loaded', array($this, 'check_woocommerce'), 10);
+    }
+
+    /**
+     * Declare HPOS compatibility
+     */
+    public function declare_compatibility()
+    {
+        if (class_exists('\Automattic\WooCommerce\Utilities\FeaturesUtil')) {
+            \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
+            \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('cart_checkout_blocks', __FILE__, false);
+        }
+    }
+
+    /**
+     * Check if WooCommerce is active and initialize plugin
+     */
+    public function check_woocommerce()
+    {
         // Check if WooCommerce is active
-        if (!$this->is_woocommerce_active()) {
+        if (!class_exists('WooCommerce')) {
             add_action('admin_notices', array($this, 'woocommerce_missing_notice'));
             return;
         }
@@ -80,16 +103,9 @@ class WC_Balikovna_Komplet
 
         // Initialize the plugin
         $this->init_hooks();
-    }
-
-    /**
-     * Check if WooCommerce is active
-     *
-     * @return bool
-     */
-    private function is_woocommerce_active()
-    {
-        return class_exists('WooCommerce');
+        
+        // Initialize plugin components immediately
+        $this->init();
     }
 
     /**
@@ -127,9 +143,6 @@ class WC_Balikovna_Komplet
 
         // Add shipping method
         add_filter('woocommerce_shipping_methods', array($this, 'add_shipping_method'));
-
-        // Initialize classes
-        add_action('plugins_loaded', array($this, 'init'), 0);
     }
 
     /**
