@@ -357,6 +357,7 @@ class WC_Balikovna_Label
         
         // For now, we'll simulate a successful response
         // and generate a mock PDF URL
+        // NOTE: In development, ensure assets/template.pdf exists or modify this to return a valid test URL
         
         $mock_label_url = WC_BALIKOVNA_PLUGIN_URL . 'assets/template.pdf';
         

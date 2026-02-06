@@ -152,8 +152,12 @@ class WC_Balikovna_Checkout
                     return;
                 }
                 
-                // Check if this is the picker result
-                if (event.data && event.data.message === 'pickerResult') {
+                // Check if this is the picker result with proper message structure validation
+                if (event.data && 
+                    typeof event.data === 'object' && 
+                    event.data.message === 'pickerResult' &&
+                    event.data.branch &&
+                    typeof event.data.branch === 'object') {
                     var branch = event.data.branch;
                     if (branch) {
                         // Create branch data object
@@ -225,16 +229,24 @@ class WC_Balikovna_Checkout
                 }
             } else {
                 // Validate address fields for Address type
-                if (empty($_POST['billing_address_1']) && empty($_POST['shipping_address_1'])) {
-                    wc_add_notice(__('Vyplňte prosím dodací adresu', 'wc-balikovna-komplet'), 'error');
-                }
-                if (empty($_POST['billing_city']) && empty($_POST['shipping_city'])) {
-                    wc_add_notice(__('Vyplňte prosím město', 'wc-balikovna-komplet'), 'error');
-                }
-                if (empty($_POST['billing_postcode']) && empty($_POST['shipping_postcode'])) {
-                    wc_add_notice(__('Vyplňte prosím PSČ', 'wc-balikovna-komplet'), 'error');
-                }
+                $this->validate_required_address_fields();
             }
+        }
+    }
+
+    /**
+     * Validate required address fields
+     */
+    private function validate_required_address_fields()
+    {
+        if (empty($_POST['billing_address_1']) && empty($_POST['shipping_address_1'])) {
+            wc_add_notice(__('Vyplňte prosím dodací adresu', 'wc-balikovna-komplet'), 'error');
+        }
+        if (empty($_POST['billing_city']) && empty($_POST['shipping_city'])) {
+            wc_add_notice(__('Vyplňte prosím město', 'wc-balikovna-komplet'), 'error');
+        }
+        if (empty($_POST['billing_postcode']) && empty($_POST['shipping_postcode'])) {
+            wc_add_notice(__('Vyplňte prosím PSČ', 'wc-balikovna-komplet'), 'error');
         }
     }
 
