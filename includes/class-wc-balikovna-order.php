@@ -50,6 +50,9 @@ class WC_Balikovna_Order
 
         // Add branch info to order admin page
         add_action('woocommerce_admin_order_data_after_shipping_address', array($this, 'display_branch_info_in_admin'));
+
+        // Add label button to order admin page
+        add_action('woocommerce_admin_order_data_after_shipping_address', array($this, 'add_label_button_to_order'), 20);
     }
 
     /**
@@ -272,6 +275,44 @@ class WC_Balikovna_Order
 
         echo '</div>';
         echo '</details>';
+        echo '</div>';
+    }
+
+    /**
+     * Add label generation button to order admin page
+     *
+     * @param WC_Order $order
+     */
+    public function add_label_button_to_order($order)
+    {
+        // Check if order uses Balikovna shipping
+        $shipping_methods = $order->get_shipping_methods();
+        $is_balikovna = false;
+        
+        foreach ($shipping_methods as $shipping_method) {
+            if (strpos($shipping_method->get_method_id(), 'balikovna') !== false) {
+                $is_balikovna = true;
+                break;
+            }
+        }
+        
+        if (!$is_balikovna) {
+            return;
+        }
+        
+        $order_id = $order->get_id();
+        $tracking_number = $order->get_meta('_wc_balikovna_tracking_number');
+        
+        echo '<div class="wc-balikovna-admin-section" style="margin-top: 20px; padding: 15px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px;">';
+        echo '<h3>' . esc_html__('Balíkovna - Štítky', 'wc-balikovna-komplet') . '</h3>';
+        
+        if ($tracking_number) {
+            echo '<p><strong>' . esc_html__('Tracking:', 'wc-balikovna-komplet') . '</strong> ' . esc_html($tracking_number) . '</p>';
+            echo '<a href="' . esc_url(admin_url('admin.php?action=wc_balikovna_print_label&order_id=' . $order_id . '&_wpnonce=' . wp_create_nonce('wc_balikovna_print_label'))) . '" class="button button-secondary" target="_blank">' . esc_html__('Stáhnout štítek (PDF)', 'wc-balikovna-komplet') . '</a>';
+        } else {
+            echo '<a href="' . esc_url(admin_url('admin.php?action=wc_balikovna_generate_label&order_id=' . $order_id . '&_wpnonce=' . wp_create_nonce('wc_balikovna_generate_label'))) . '" class="button button-primary">' . esc_html__('Vygenerovat štítek', 'wc-balikovna-komplet') . '</a>';
+        }
+        
         echo '</div>';
     }
 }

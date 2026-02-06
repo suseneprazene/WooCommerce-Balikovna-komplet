@@ -95,12 +95,8 @@ class WC_Balikovna_Checkout
             return;
         }
 
-        $chosen_methods = WC()->session->get('chosen_shipping_methods');
-        $chosen_shipping = $chosen_methods[0];
-
-        if (strpos($chosen_shipping, 'balikovna') === false) {
-            return;
-        }
+        // Get method ID for detection
+        $method_id = $method->get_id();
 
         // Get delivery type from rate meta data
         $meta_data = $method->get_meta_data();
@@ -111,80 +107,99 @@ class WC_Balikovna_Checkout
 
         // Render appropriate field based on delivery type
         if ($delivery_type === 'box') {
-            $this->render_box_selection();
+            $this->render_box_selection($method_id);
         } else {
-            $this->render_address_notice();
+            $this->render_address_notice($method_id);
         }
     }
 
     /**
      * Render box selection with iframe
+     *
+     * @param string $method_id The shipping method ID
      */
-    private function render_box_selection()
+    private function render_box_selection($method_id)
     {
         ?>
-        <div class="wc-balikovna-branch-selection" style="margin-top: 15px;">
+        <div id="balikovna_iframe_container" class="wc-balikovna-branch-selection" style="margin-top: 15px; display: none;">
             <label for="wc_balikovna_branch_iframe">
                 <?php echo esc_html__('Vyberte pobočku Balíkovny', 'wc-balikovna-komplet'); ?>
                 <span class="required">*</span>
             </label>
-            <div id="wc-balikovna-iframe-container" style="margin-top: 10px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden;">
+            <div style="margin-top: 10px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden;">
                 <iframe 
-                    id="wc_balikovna_branch_iframe" 
+                    id="balikovna_iframe" 
                     src="https://b2c.cpost.cz/locations/?type=BALIKOVNY" 
                     style="width: 100%; height: 500px; border: none;"
                     frameborder="0"
+                    allow="geolocation"
                 ></iframe>
             </div>
             <input type="hidden" id="wc_balikovna_branch" name="wc_balikovna_branch" value="">
             <input type="hidden" name="wc_balikovna_delivery_type" value="box">
-            <div id="wc-balikovna-selected-info" style="display: none; margin-top: 10px; padding: 10px; background: #f0f8ff; border: 1px solid #b3d9ff; border-radius: 4px;">
-                <strong><?php echo esc_html__('Vybraná pobočka:', 'wc-balikovna-komplet'); ?></strong>
-                <div id="wc-balikovna-selected-details"></div>
+            <div id="balikovna_selected_display" style="display: none; margin-top: 10px; padding: 10px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px;">
+                <strong style="color: green;">✓ <?php echo esc_html__('Vybraná pobočka:', 'wc-balikovna-komplet'); ?></strong>
+                <div id="balikovna_selected_info"></div>
             </div>
         </div>
         <script>
         jQuery(function($) {
-            // Listen for postMessage from iframe
-            window.addEventListener('message', function(event) {
-                // Verify origin
-                if (event.origin !== 'https://b2c.cpost.cz') {
-                    return;
-                }
-                
-                // Check if this is the picker result with proper message structure validation
-                if (event.data && 
-                    typeof event.data === 'object' && 
-                    event.data.message === 'pickerResult' &&
-                    event.data.branch &&
-                    typeof event.data.branch === 'object') {
-                    var branch = event.data.branch;
-                    if (branch) {
+            // Setup postMessage listener only once
+            if (!window.balikovnaListenerSet) {
+                window.addEventListener('message', function(event) {
+                    // CRITICAL: Check origin for security
+                    if (event.origin !== 'https://b2c.cpost.cz') {
+                        return;
+                    }
+                    
+                    // Check if this is the picker result
+                    if (typeof event.data === 'object' && event.data.message === 'pickerResult') {
+                        var data = event.data.point;
+                        
+                        if (!data) return;
+                        
                         // Create branch data object
                         var branchData = {
-                            id: branch.id || '',
-                            name: branch.name || '',
-                            city: branch.city || '',
-                            city_part: branch.city_part || '',
-                            address: branch.address || '',
-                            zip: branch.zip || '',
-                            kind: branch.kind || ''
+                            id: data.id,
+                            name: data.name,
+                            city: data.municipality_name || '',
+                            city_part: data.city_part || '',
+                            address: data.address,
+                            zip: data.zip,
+                            kind: data.type || 'balikovna'
                         };
                         
                         // Save to hidden field as JSON
                         $('#wc_balikovna_branch').val(JSON.stringify(branchData));
                         
                         // Display selected branch info
-                        var infoHtml = '<p style="margin: 5px 0;">' +
-                            '<strong>' + branchData.name + '</strong><br>' +
-                            branchData.address + ', ' + branchData.zip + ' ' + branchData.city +
-                            (branchData.city_part ? ' - ' + branchData.city_part : '') +
-                            '</p>';
-                        $('#wc-balikovna-selected-details').html(infoHtml);
-                        $('#wc-balikovna-selected-info').show();
+                        $('#balikovna_selected_info').html(
+                            '<strong>' + data.name + '</strong><br>' +
+                            data.address + '<br>' +
+                            data.municipality_name + ', ' + data.zip
+                        );
+                        $('#balikovna_selected_display').fadeIn();
+                        
+                        // Update checkout
+                        $(document.body).trigger('update_checkout');
                     }
-                }
-            }, false);
+                });
+                
+                window.balikovnaListenerSet = true;
+            }
+            
+            // Toggle iframe visibility based on shipping method selection
+            function toggleBalikovnaBox() {
+                var isSelected = $('#<?php echo esc_js($method_id); ?>').is(':checked');
+                $('#balikovna_iframe_container').toggle(isSelected);
+            }
+            
+            // Initialize visibility
+            toggleBalikovnaBox();
+            
+            // Listen for shipping method changes
+            $(document.body).on('change', 'input[name^="shipping_method"]', toggleBalikovnaBox);
+            $(document.body).on('updated_checkout', toggleBalikovnaBox);
         });
         </script>
         <?php
@@ -192,8 +207,10 @@ class WC_Balikovna_Checkout
 
     /**
      * Render address notice for home delivery
+     *
+     * @param string $method_id The shipping method ID
      */
-    private function render_address_notice()
+    private function render_address_notice($method_id)
     {
         ?>
         <div class="wc-balikovna-address-notice" style="margin-top: 15px; padding: 15px; background: #f0f8ff; border: 1px solid #b3d9ff; border-radius: 4px;">
@@ -203,6 +220,21 @@ class WC_Balikovna_Checkout
             </p>
             <input type="hidden" name="wc_balikovna_delivery_type" value="address">
         </div>
+        <script>
+        jQuery(function($) {
+            // Hide iframe container when address delivery is selected
+            function hideIframeForAddress() {
+                var isSelected = $('#<?php echo esc_js($method_id); ?>').is(':checked');
+                if (isSelected) {
+                    $('#balikovna_iframe_container').hide();
+                }
+            }
+            
+            hideIframeForAddress();
+            $(document.body).on('change', 'input[name^="shipping_method"]', hideIframeForAddress);
+            $(document.body).on('updated_checkout', hideIframeForAddress);
+        });
+        </script>
         <?php
     }
 
