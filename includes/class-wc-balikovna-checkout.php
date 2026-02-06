@@ -156,7 +156,9 @@ class WC_Balikovna_Checkout
                     if (typeof event.data === 'object' && event.data.message === 'pickerResult') {
                         var data = event.data.point;
                         
-                        if (!data) return;
+                        // Validate that point data exists and has required fields
+                        if (!data || typeof data !== 'object') return;
+                        if (!data.id || !data.name || !data.address) return;
                         
                         // Create branch data object
                         var branchData = {

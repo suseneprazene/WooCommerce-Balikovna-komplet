@@ -308,9 +308,16 @@ class WC_Balikovna_Order
         
         if ($tracking_number) {
             echo '<p><strong>' . esc_html__('Tracking:', 'wc-balikovna-komplet') . '</strong> ' . esc_html($tracking_number) . '</p>';
-            echo '<a href="' . esc_url(admin_url('admin.php?action=wc_balikovna_print_label&order_id=' . $order_id . '&_wpnonce=' . wp_create_nonce('wc_balikovna_print_label'))) . '" class="button button-secondary" target="_blank">' . esc_html__('Stáhnout štítek (PDF)', 'wc-balikovna-komplet') . '</a>';
+            
+            $print_url = admin_url('admin.php?action=wc_balikovna_print_label&order_id=' . $order_id . '&_wpnonce=' . wp_create_nonce('wc_balikovna_print_label'));
+            echo '<a href="' . esc_url($print_url) . '" class="button button-secondary" target="_blank">';
+            echo esc_html__('Stáhnout štítek (PDF)', 'wc-balikovna-komplet');
+            echo '</a>';
         } else {
-            echo '<a href="' . esc_url(admin_url('admin.php?action=wc_balikovna_generate_label&order_id=' . $order_id . '&_wpnonce=' . wp_create_nonce('wc_balikovna_generate_label'))) . '" class="button button-primary">' . esc_html__('Vygenerovat štítek', 'wc-balikovna-komplet') . '</a>';
+            $generate_url = admin_url('admin.php?action=wc_balikovna_generate_label&order_id=' . $order_id . '&_wpnonce=' . wp_create_nonce('wc_balikovna_generate_label'));
+            echo '<a href="' . esc_url($generate_url) . '" class="button button-primary">';
+            echo esc_html__('Vygenerovat štítek', 'wc-balikovna-komplet');
+            echo '</a>';
         }
         
         echo '</div>';
