@@ -190,7 +190,8 @@ class WC_Balikovna_Checkout
             
             // Toggle iframe visibility based on shipping method selection
             function toggleBalikovnaBox() {
-                var isSelected = $('#<?php echo esc_js($method_id); ?>').is(':checked');
+                var selectedMethod = $('input[name^="shipping_method"]:checked').val();
+                var isSelected = selectedMethod && selectedMethod === '<?php echo esc_js($method_id); ?>';
                 $('#balikovna_iframe_container').toggle(isSelected);
             }
             
@@ -223,16 +224,17 @@ class WC_Balikovna_Checkout
         <script>
         jQuery(function($) {
             // Hide iframe container when address delivery is selected
-            function hideIframeForAddress() {
-                var isSelected = $('#<?php echo esc_js($method_id); ?>').is(':checked');
+            function hideIframeIfAddressSelected() {
+                var selectedMethod = $('input[name^="shipping_method"]:checked').val();
+                var isSelected = selectedMethod && selectedMethod === '<?php echo esc_js($method_id); ?>';
                 if (isSelected) {
                     $('#balikovna_iframe_container').hide();
                 }
             }
             
-            hideIframeForAddress();
-            $(document.body).on('change', 'input[name^="shipping_method"]', hideIframeForAddress);
-            $(document.body).on('updated_checkout', hideIframeForAddress);
+            hideIframeIfAddressSelected();
+            $(document.body).on('change', 'input[name^="shipping_method"]', hideIframeIfAddressSelected);
+            $(document.body).on('updated_checkout', hideIframeIfAddressSelected);
         });
         </script>
         <?php
