@@ -8,6 +8,9 @@ Plugin umožňuje zákazníkům vybrat si pobočku Balíkovny České pošty př
 
 ## Funkce
 
+- ✅ Dva typy doručení: Do boxu nebo Na adresu
+- ✅ Generování štítků pro tisk
+- ✅ API integrace s Českou poštou
 - ✅ Vlastní dopravní metoda pro WooCommerce
 - ✅ Vyhledávání poboček podle města, PSČ nebo adresy
 - ✅ Select2 dropdown s pokročilým vyhledáváním
@@ -128,6 +131,14 @@ GPL v3 or later
 [suseneprazene](https://github.com/suseneprazene)
 
 ## Changelog
+
+### 1.0.2
+- Přidána podpora pro dva typy doručení (Box a Adresa)
+- Přidána možnost generování štítků
+- Iframe výběr pobočky pro Box typ
+- Automatická validace adresy pro Address typ
+- API integrace pro tisk štítků
+- Vylepšená kompatibilita s WooCommerce 9.5
 
 ### 1.0.0
 - Počáteční vydání

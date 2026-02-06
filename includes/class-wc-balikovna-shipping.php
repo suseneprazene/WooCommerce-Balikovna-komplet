@@ -46,6 +46,7 @@ class WC_Balikovna_Shipping_Method extends WC_Shipping_Method
         $this->enabled = $this->get_option('enabled');
         $this->cost = $this->get_option('cost');
         $this->free_shipping_threshold = $this->get_option('free_shipping_threshold');
+        $this->delivery_type = $this->get_option('delivery_type', 'box');
 
         // Save settings
         add_action('woocommerce_update_options_shipping_' . $this->id, array($this, 'process_admin_options'));
@@ -62,6 +63,17 @@ class WC_Balikovna_Shipping_Method extends WC_Shipping_Method
                 'type' => 'text',
                 'description' => __('Název dopravy zobrazený zákazníkovi', 'wc-balikovna-komplet'),
                 'default' => __('Balíkovna České pošty', 'wc-balikovna-komplet'),
+                'desc_tip' => true,
+            ),
+            'delivery_type' => array(
+                'title' => __('Typ doručení', 'wc-balikovna-komplet'),
+                'type' => 'select',
+                'description' => __('Vyberte způsob doručení', 'wc-balikovna-komplet'),
+                'default' => 'box',
+                'options' => array(
+                    'box' => __('Do boxu (výběr pobočky)', 'wc-balikovna-komplet'),
+                    'address' => __('Na adresu (bez výběru pobočky)', 'wc-balikovna-komplet'),
+                ),
                 'desc_tip' => true,
             ),
             'cost' => array(
@@ -106,8 +118,21 @@ class WC_Balikovna_Shipping_Method extends WC_Shipping_Method
             'label' => $this->title,
             'cost' => $cost,
             'package' => $package,
+            'meta_data' => array(
+                'delivery_type' => $this->delivery_type,
+            ),
         );
 
         $this->add_rate($rate);
+    }
+
+    /**
+     * Get delivery type
+     *
+     * @return string
+     */
+    public function get_delivery_type()
+    {
+        return $this->delivery_type;
     }
 }

@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce Balíkovna Komplet
  * Plugin URI: https://github.com/suseneprazene/WooCommerce-Balikovna-komplet
  * Description: Integrace Balíkoven České pošty do WooCommerce s podporou výběru pobočky při checkoutu
- * Version: 1.0.0
+ * Version: 1.0.2
  * Author: suseneprazene
  * Author URI: https://github.com/suseneprazene
  * Text Domain: wc-balikovna-komplet
@@ -11,7 +11,7 @@
  * Requires at least: 5.0
  * Requires PHP: 7.4
  * WC requires at least: 5.0
- * WC tested up to: 9.0
+ * WC tested up to: 9.5
  * License: GPL v3 or later
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
  * 
@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('WC_BALIKOVNA_VERSION', '1.0.0');
+define('WC_BALIKOVNA_VERSION', '1.0.2');
 define('WC_BALIKOVNA_PLUGIN_FILE', __FILE__);
 define('WC_BALIKOVNA_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WC_BALIKOVNA_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -77,12 +77,14 @@ class WC_Balikovna_Komplet
     }
 
     /**
-     * Declare HPOS compatibility
+     * Declare HPOS and other WooCommerce compatibility features
      */
     public function declare_compatibility()
     {
         if (class_exists('\Automattic\WooCommerce\Utilities\FeaturesUtil')) {
+            // Declare High-Performance Order Storage (HPOS) compatibility
             \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
+            // Declare Cart & Checkout Blocks compatibility (not yet supported)
             \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('cart_checkout_blocks', __FILE__, false);
         }
     }
@@ -128,6 +130,7 @@ class WC_Balikovna_Komplet
         require_once WC_BALIKOVNA_PLUGIN_DIR . 'includes/class-wc-balikovna-checkout.php';
         require_once WC_BALIKOVNA_PLUGIN_DIR . 'includes/class-wc-balikovna-admin.php';
         require_once WC_BALIKOVNA_PLUGIN_DIR . 'includes/class-wc-balikovna-order.php';
+        require_once WC_BALIKOVNA_PLUGIN_DIR . 'includes/class-wc-balikovna-label.php';
     }
 
     /**
@@ -159,6 +162,7 @@ class WC_Balikovna_Komplet
         // Initialize admin functionality
         if (is_admin()) {
             WC_Balikovna_Admin::instance();
+            WC_Balikovna_Label::instance();
         }
 
         // Initialize order functionality
