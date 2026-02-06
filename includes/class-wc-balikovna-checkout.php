@@ -175,10 +175,12 @@ class WC_Balikovna_Checkout
                         $('#wc_balikovna_branch').val(JSON.stringify(branchData));
                         
                         // Display selected branch info
+                        var displayCity = data.municipality_name || '';
+                        var displayZip = data.zip || '';
                         $('#balikovna_selected_info').html(
                             '<strong>' + data.name + '</strong><br>' +
                             data.address + '<br>' +
-                            data.municipality_name + ', ' + data.zip
+                            displayCity + (displayZip ? ', ' + displayZip : '')
                         );
                         $('#balikovna_selected_display').fadeIn();
                         
@@ -226,7 +228,7 @@ class WC_Balikovna_Checkout
         <script>
         jQuery(function($) {
             // Hide iframe container when address delivery is selected
-            function hideIframeIfAddressSelected() {
+            function hideIframeForAddressDelivery() {
                 var selectedMethod = $('input[name^="shipping_method"]:checked').val();
                 var isSelected = selectedMethod && selectedMethod === '<?php echo esc_js($method_id); ?>';
                 if (isSelected) {
@@ -234,9 +236,9 @@ class WC_Balikovna_Checkout
                 }
             }
             
-            hideIframeIfAddressSelected();
-            $(document.body).on('change', 'input[name^="shipping_method"]', hideIframeIfAddressSelected);
-            $(document.body).on('updated_checkout', hideIframeIfAddressSelected);
+            hideIframeForAddressDelivery();
+            $(document.body).on('change', 'input[name^="shipping_method"]', hideIframeForAddressDelivery);
+            $(document.body).on('updated_checkout', hideIframeForAddressDelivery);
         });
         </script>
         <?php
