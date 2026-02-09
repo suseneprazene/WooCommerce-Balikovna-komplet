@@ -204,21 +204,66 @@ class WC_Balikovna_Label
      */
     public function generate_label($order)
     {
+        error_log('=== WC Balíkovna: Starting label generation for order #' . $order->get_id() . ' ===');
+        
         // Get delivery type
         $delivery_type = $order->get_meta('_wc_balikovna_delivery_type');
 
         if (empty($delivery_type)) {
+            error_log('WC Balíkovna Label ERROR: No delivery type found for order #' . $order->get_id());
             return array(
                 'success' => false,
-                'message' => __('Tato objednávka není objednávka Balíkovny', 'wc-balikovna-komplet')
+                'message' => __('Tato objednávka není objednávka Balíkovny (chybí delivery_type)', 'wc-balikovna-komplet')
             );
         }
 
+        error_log('WC Balíkovna Label: Delivery type: ' . $delivery_type);
+
         // Check if API credentials are set
-        if (empty($this->api_username) || empty($this->api_password)) {
+        $api_token = get_option('wc_balikovna_api_token', '');
+        $api_private_key = get_option('wc_balikovna_api_private_key', '');
+        
+        if (empty($api_token)) {
+            error_log('WC Balíkovna Label ERROR: API token not configured');
             return array(
                 'success' => false,
-                'message' => __('API credentials nejsou nastaveny. Kontaktujte administrátora.', 'wc-balikovna-komplet')
+                'message' => __('API token není nastaven. Nastavte jej v Nastavení → Balíkovna.', 'wc-balikovna-komplet')
+            );
+        }
+        
+        if (empty($api_private_key)) {
+            error_log('WC Balíkovna Label ERROR: API private key not configured');
+            return array(
+                'success' => false,
+                'message' => __('Privátní klíč API není nastaven. Nastavte jej v Nastavení → Balíkovna.', 'wc-balikovna-komplet')
+            );
+        }
+
+        // Validate sender information
+        $missing_sender_fields = array();
+        $sender_fields = array(
+            'wc_balikovna_sender_name' => 'Jméno odesílatele',
+            'wc_balikovna_sender_street' => 'Ulice odesílatele',
+            'wc_balikovna_sender_city' => 'Město odesílatele',
+            'wc_balikovna_sender_zip' => 'PSČ odesílatele',
+            'wc_balikovna_sender_phone' => 'Telefon odesílatele',
+            'wc_balikovna_sender_email' => 'Email odesílatele',
+        );
+        
+        foreach ($sender_fields as $field => $label) {
+            if (empty(get_option($field))) {
+                $missing_sender_fields[] = $label;
+            }
+        }
+        
+        if (!empty($missing_sender_fields)) {
+            error_log('WC Balíkovna Label ERROR: Missing sender fields: ' . implode(', ', $missing_sender_fields));
+            return array(
+                'success' => false,
+                'message' => sprintf(
+                    __('Chybí údaje odesílatele: %s. Doplňte je v Nastavení → Balíkovna.', 'wc-balikovna-komplet'),
+                    implode(', ', $missing_sender_fields)
+                )
             );
         }
 
@@ -228,6 +273,12 @@ class WC_Balikovna_Label
         } else {
             $result = $this->generate_address_label($order);
         }
+
+        error_log('WC Balíkovna: Label generation result: ' . ($result['success'] ? 'SUCCESS' : 'FAILED'));
+        if (!$result['success']) {
+            error_log('WC Balíkovna Label ERROR: ' . $result['message']);
+        }
+        error_log('=== WC Balíkovna: Label generation finished ===');
 
         return $result;
     }
@@ -243,11 +294,28 @@ class WC_Balikovna_Label
         // Get branch data
         $branch_id = $order->get_meta('_wc_balikovna_branch_id');
         $branch_name = $order->get_meta('_wc_balikovna_branch_name');
+        
+        error_log('WC Balíkovna Label: Branch ID: ' . $branch_id);
+        error_log('WC Balíkovna Label: Branch Name: ' . $branch_name);
 
         if (empty($branch_id)) {
+            error_log('WC Balíkovna Label ERROR: Branch ID is empty for order #' . $order->get_id());
             return array(
                 'success' => false,
-                'message' => __('Pobočka nebyla vybrána', 'wc-balikovna-komplet')
+                'message' => __('Pobočka nebyla vybrána při objednávce. ID pobočky chybí.', 'wc-balikovna-komplet')
+            );
+        }
+
+        // Validate required order data
+        $validation = $this->validate_order_data($order);
+        if (!$validation['valid']) {
+            error_log('WC Balíkovna Label ERROR: Missing order fields: ' . implode(', ', $validation['missing_fields']));
+            return array(
+                'success' => false,
+                'message' => sprintf(
+                    __('Chybí údaje objednávky: %s', 'wc-balikovna-komplet'),
+                    implode(', ', $validation['missing_fields'])
+                )
             );
         }
 
@@ -257,14 +325,16 @@ class WC_Balikovna_Label
             'branchId' => $branch_id,
             'branchName' => $branch_name,
             'orderNumber' => $order->get_order_number(),
-            'customerName' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+            'customerName' => $this->get_customer_name($order),
             'customerEmail' => $order->get_billing_email(),
             'customerPhone' => $order->get_billing_phone(),
             'weight' => $this->calculate_order_weight($order),
             'codAmount' => $order->get_payment_method() === 'cod' ? $order->get_total() : 0,
         );
+        
+        error_log('WC Balíkovna Label: Prepared data: ' . json_encode($data));
 
-        // Call API (placeholder for actual API implementation)
+        // Call API
         $api_result = $this->call_api('label/generate', $data, $order);
 
         if ($api_result['success']) {
@@ -273,6 +343,8 @@ class WC_Balikovna_Label
             $order->update_meta_data('_wc_balikovna_label_url', $api_result['label_url']);
             $order->update_meta_data('_wc_balikovna_label_date', current_time('mysql'));
             $order->save();
+            
+            error_log('WC Balíkovna Label: Label saved to order meta');
 
             return array(
                 'success' => true,
@@ -298,11 +370,35 @@ class WC_Balikovna_Label
         $address = $order->get_shipping_address_1() ?: $order->get_billing_address_1();
         $city = $order->get_shipping_city() ?: $order->get_billing_city();
         $postcode = $order->get_shipping_postcode() ?: $order->get_billing_postcode();
+        
+        error_log('WC Balíkovna Label: Address: ' . $address . ', ' . $city . ', ' . $postcode);
 
         if (empty($address) || empty($city) || empty($postcode)) {
+            error_log('WC Balíkovna Label ERROR: Incomplete delivery address for order #' . $order->get_id());
+            $missing = array();
+            if (empty($address)) $missing[] = 'Ulice';
+            if (empty($city)) $missing[] = 'Město';
+            if (empty($postcode)) $missing[] = 'PSČ';
+            
             return array(
                 'success' => false,
-                'message' => __('Dodací adresa není kompletní', 'wc-balikovna-komplet')
+                'message' => sprintf(
+                    __('Dodací adresa není kompletní. Chybí: %s', 'wc-balikovna-komplet'),
+                    implode(', ', $missing)
+                )
+            );
+        }
+        
+        // Validate required order data
+        $validation = $this->validate_order_data($order);
+        if (!$validation['valid']) {
+            error_log('WC Balíkovna Label ERROR: Missing order fields: ' . implode(', ', $validation['missing_fields']));
+            return array(
+                'success' => false,
+                'message' => sprintf(
+                    __('Chybí údaje objednávky: %s', 'wc-balikovna-komplet'),
+                    implode(', ', $validation['missing_fields'])
+                )
             );
         }
 
@@ -313,14 +409,16 @@ class WC_Balikovna_Label
             'city' => $city,
             'postcode' => $postcode,
             'orderNumber' => $order->get_order_number(),
-            'customerName' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+            'customerName' => $this->get_customer_name($order),
             'customerEmail' => $order->get_billing_email(),
             'customerPhone' => $order->get_billing_phone(),
             'weight' => $this->calculate_order_weight($order),
             'codAmount' => $order->get_payment_method() === 'cod' ? $order->get_total() : 0,
         );
+        
+        error_log('WC Balíkovna Label: Prepared data: ' . json_encode($data));
 
-        // Call API (placeholder for actual API implementation)
+        // Call API
         $api_result = $this->call_api('label/generate', $data, $order);
 
         if ($api_result['success']) {
@@ -329,6 +427,8 @@ class WC_Balikovna_Label
             $order->update_meta_data('_wc_balikovna_label_url', $api_result['label_url']);
             $order->update_meta_data('_wc_balikovna_label_date', current_time('mysql'));
             $order->save();
+            
+            error_log('WC Balíkovna Label: Label saved to order meta');
 
             return array(
                 'success' => true,
@@ -352,57 +452,152 @@ class WC_Balikovna_Label
      */
     private function call_api($endpoint, $data, $order)
     {
-        // This is a placeholder for actual API implementation
+        // Get API credentials from settings
+        $api_token = get_option('wc_balikovna_api_token', '');
+        
+        error_log('WC Balíkovna API: Calling endpoint: ' . $endpoint);
+        error_log('WC Balíkovna API: Request data: ' . json_encode($data));
+        
+        // For now, this is a mock implementation
         // In production, this would make an actual HTTP request to the Czech Post API
+        // The actual API endpoint and structure would need to be determined based on Czech Post documentation
         
-        // For now, we'll simulate a successful response
-        // and generate a mock PDF URL
-        // NOTE: In development, ensure assets/template.pdf exists or modify this to return a valid test URL
-        
+        // Mock response for testing
         $mock_label_url = WC_BALIKOVNA_PLUGIN_URL . 'assets/template.pdf';
+        
+        error_log('WC Balíkovna API: Mock response - returning success with URL: ' . $mock_label_url);
         
         return array(
             'success' => true,
             'label_url' => $mock_label_url,
-            'message' => __('API volání bylo úspěšné (MOCK)', 'wc-balikovna-komplet')
+            'message' => __('Štítek byl úspěšně vygenerován (MOCK - implementace skutečného API volání čeká na dokumentaci API České pošty)', 'wc-balikovna-komplet')
         );
 
         /*
         // Real API implementation would look like this:
         $url = $this->api_url . $endpoint;
         
+        $request_body = json_encode($data);
+        
+        error_log('WC Balíkovna API: Request URL: ' . $url);
+        error_log('WC Balíkovna API: Request body: ' . $request_body);
+        
         $response = wp_remote_post($url, array(
             'headers' => array(
                 'Content-Type' => 'application/json',
-                'Authorization' => 'Basic ' . base64_encode($this->api_username . ':' . $this->api_password)
+                'Authorization' => 'Bearer ' . $api_token,
             ),
-            'body' => json_encode($data),
+            'body' => $request_body,
             'timeout' => 30
         ));
 
         if (is_wp_error($response)) {
+            $error_message = $response->get_error_message();
+            error_log('WC Balíkovna API ERROR: wp_remote_post failed: ' . $error_message);
             return array(
                 'success' => false,
-                'message' => __('Chyba při komunikaci s API: ', 'wc-balikovna-komplet') . $response->get_error_message()
+                'message' => sprintf(
+                    __('Chyba při komunikaci s API: %s', 'wc-balikovna-komplet'),
+                    $error_message
+                )
             );
         }
 
+        $http_code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
+        
+        error_log('WC Balíkovna API: Response HTTP code: ' . $http_code);
+        error_log('WC Balíkovna API: Response body: ' . $body);
+
+        if ($http_code !== 200 && $http_code !== 201) {
+            error_log('WC Balíkovna API ERROR: Non-success HTTP code: ' . $http_code);
+            return array(
+                'success' => false,
+                'message' => sprintf(
+                    __('API vrátilo chybu HTTP %d. Odpověď: %s', 'wc-balikovna-komplet'),
+                    $http_code,
+                    substr($body, 0, 200)
+                )
+            );
+        }
+        
         $result = json_decode($body, true);
+        
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            error_log('WC Balíkovna API ERROR: Failed to parse JSON response: ' . json_last_error_msg());
+            return array(
+                'success' => false,
+                'message' => sprintf(
+                    __('Chyba při parsování odpovědi API: %s', 'wc-balikovna-komplet'),
+                    json_last_error_msg()
+                )
+            );
+        }
 
         if (isset($result['error'])) {
+            error_log('WC Balíkovna API ERROR: API returned error: ' . $result['error']);
             return array(
                 'success' => false,
-                'message' => __('API chyba: ', 'wc-balikovna-komplet') . $result['error']
+                'message' => sprintf(
+                    __('API chyba: %s', 'wc-balikovna-komplet'),
+                    $result['error']
+                )
+            );
+        }
+        
+        if (!isset($result['label_url'])) {
+            error_log('WC Balíkovna API ERROR: Missing label_url in API response');
+            return array(
+                'success' => false,
+                'message' => __('API nevrátilo URL štítku', 'wc-balikovna-komplet')
             );
         }
 
+        error_log('WC Balíkovna API: Success - label URL: ' . $result['label_url']);
+        
         return array(
             'success' => true,
             'label_url' => $result['label_url'],
             'message' => __('Štítek byl úspěšně vygenerován', 'wc-balikovna-komplet')
         );
         */
+    }
+
+    /**
+     * Validate required order data
+     *
+     * @param WC_Order $order
+     * @return array Array with 'valid' (bool) and 'missing_fields' (array)
+     */
+    private function validate_order_data($order)
+    {
+        $missing_fields = array();
+        
+        if (empty($order->get_billing_first_name()) && empty($order->get_billing_last_name())) {
+            $missing_fields[] = 'Jméno zákazníka';
+        }
+        if (empty($order->get_billing_email())) {
+            $missing_fields[] = 'Email zákazníka';
+        }
+        if (empty($order->get_billing_phone())) {
+            $missing_fields[] = 'Telefon zákazníka';
+        }
+        
+        return array(
+            'valid' => empty($missing_fields),
+            'missing_fields' => $missing_fields
+        );
+    }
+
+    /**
+     * Get formatted customer name from order
+     *
+     * @param WC_Order $order
+     * @return string
+     */
+    private function get_customer_name($order)
+    {
+        return trim($order->get_billing_first_name() . ' ' . $order->get_billing_last_name());
     }
 
     /**

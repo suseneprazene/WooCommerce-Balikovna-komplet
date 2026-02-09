@@ -78,10 +78,15 @@ class WC_Balikovna_Install
         $branches_table = $wpdb->prefix . 'balikovna_branches';
         $hours_table = $wpdb->prefix . 'balikovna_opening_hours';
 
+        // Ensure tables exist
+        self::install();
+
         // Check if API URL is defined
         if (!defined('WC_BALIKOVNA_API_URL')) {
             error_log('WC Balíkovna ERROR: WC_BALIKOVNA_API_URL is not defined');
-            return new WP_Error('missing_constant', 'Konstanta WC_BALIKOVNA_API_URL není definována');
+            $error_msg = 'Konstanta WC_BALIKOVNA_API_URL není definována';
+            update_option('balikovna_last_update_error', $error_msg);
+            return new WP_Error('missing_constant', $error_msg);
         }
 
         error_log('WC Balíkovna: API URL: ' . WC_BALIKOVNA_API_URL);
@@ -90,23 +95,34 @@ class WC_Balikovna_Install
         error_log('WC Balíkovna: Downloading XML...');
         $xml_data = wp_remote_get(WC_BALIKOVNA_API_URL, array(
             'timeout' => 60,
-            'sslverify' => true,
+            'sslverify' => true, // Enable SSL verification for security
         ));
 
         if (is_wp_error($xml_data)) {
             error_log('WC Balíkovna ERROR: ' . $xml_data->get_error_message());
-            return $xml_data;
+            $error_msg = 'Chyba při stahování dat: ' . $xml_data->get_error_message();
+            update_option('balikovna_last_update_error', $error_msg);
+            return new WP_Error('download_error', $error_msg);
         }
 
         $response_code = wp_remote_retrieve_response_code($xml_data);
         error_log('WC Balíkovna: Response code: ' . $response_code);
+
+        if ($response_code !== 200) {
+            $error_msg = sprintf('HTTP chyba: %d', $response_code);
+            error_log('WC Balíkovna ERROR: ' . $error_msg);
+            update_option('balikovna_last_update_error', $error_msg);
+            return new WP_Error('http_error', $error_msg);
+        }
 
         $body = wp_remote_retrieve_body($xml_data);
         error_log('WC Balíkovna: Downloaded ' . strlen($body) . ' bytes');
         
         if (empty($body)) {
             error_log('WC Balíkovna ERROR: Empty response body');
-            return new WP_Error('empty_response', __('Prázdná odpověď z API České pošty', 'wc-balikovna-komplet'));
+            $error_msg = 'Prázdná odpověď z API České pošty';
+            update_option('balikovna_last_update_error', $error_msg);
+            return new WP_Error('empty_response', $error_msg);
         }
 
         // Log first 500 characters of response for debugging
@@ -120,15 +136,27 @@ class WC_Balikovna_Install
             $errors = libxml_get_errors();
             $error_messages = array();
             foreach ($errors as $error) {
-                $error_messages[] = $error->message;
+                $error_messages[] = trim($error->message);
             }
             libxml_clear_errors();
-            error_log('WC Balíkovna ERROR: XML parse errors: ' . implode(', ', $error_messages));
-            return new WP_Error('xml_parse_error', __('Chyba při parsování XML dat', 'wc-balikovna-komplet'));
+            $error_msg = 'Chyba při parsování XML dat: ' . implode(', ', $error_messages);
+            error_log('WC Balíkovna ERROR: ' . $error_msg);
+            update_option('balikovna_last_update_error', $error_msg);
+            return new WP_Error('xml_parse_error', $error_msg);
         }
 
         error_log('WC Balíkovna: XML parsed successfully');
-        error_log('WC Balíkovna: Found ' . count($xml->row) . ' rows in XML');
+        
+        // Count rows in XML
+        $xml_row_count = isset($xml->row) ? count($xml->row) : 0;
+        error_log('WC Balíkovna: Found ' . $xml_row_count . ' rows in XML');
+
+        if ($xml_row_count === 0) {
+            $error_msg = 'XML neobsahuje žádné pobočky (0 rows)';
+            error_log('WC Balíkovna ERROR: ' . $error_msg);
+            update_option('balikovna_last_update_error', $error_msg);
+            return new WP_Error('no_data', $error_msg);
+        }
 
         // Clear existing data
         $wpdb->query("TRUNCATE TABLE `{$hours_table}`");
@@ -137,9 +165,17 @@ class WC_Balikovna_Install
 
         $branches_count = 0;
         $hours_count = 0;
+        $errors_count = 0;
 
         // Process each branch
         foreach ($xml->row as $item) {
+            // Validate required fields
+            if (empty((string)$item->NAZEV) || empty((string)$item->OBEC)) {
+                error_log('WC Balíkovna WARNING: Skipping branch with missing required fields');
+                $errors_count++;
+                continue;
+            }
+
             // Insert branch
             $insert_result = $wpdb->insert(
                 $branches_table,
@@ -158,6 +194,7 @@ class WC_Balikovna_Install
 
             if ($insert_result === false) {
                 error_log('WC Balíkovna ERROR: Failed to insert branch: ' . $wpdb->last_error);
+                $errors_count++;
                 continue;
             }
 
@@ -198,11 +235,21 @@ class WC_Balikovna_Install
             }
         }
 
-        error_log('WC Balíkovna: Sync completed - ' . $branches_count . ' branches, ' . $hours_count . ' opening hours');
+        error_log('WC Balíkovna: Sync completed - ' . $branches_count . ' branches, ' . $hours_count . ' opening hours, ' . $errors_count . ' errors');
         error_log('=== WC Balíkovna: Sync finished successfully ===');
 
-        // Save timestamp
-        update_option('wc_balikovna_last_sync', time());
+        // Save timestamp and count
+        $current_time = time();
+        update_option('balikovna_last_update', $current_time);
+        update_option('balikovna_last_count', $branches_count);
+        update_option('wc_balikovna_last_sync', $current_time);
+        
+        // Clear error message on success
+        delete_option('balikovna_last_update_error');
+        
+        // Clear any cached branch data
+        delete_transient('wc_balikovna_branches_cache');
+        delete_transient('wc_balikovna_branches_timestamp');
 
         return true;
     }
