@@ -61,25 +61,7 @@ class WC_Balikovna_Install
         // Set database version
         update_option('wc_balikovna_db_version', WC_BALIKOVNA_VERSION);
 
-        // Trigger initial data sync
-        self::maybe_sync_data();
-    }
-
-    /**
-     * Sync data from Czech Post API if tables are empty
-     */
-    public static function maybe_sync_data()
-    {
-        global $wpdb;
-
-        $branches_table = $wpdb->prefix . 'balikovna_branches';
-        $count = $wpdb->get_var("SELECT COUNT(*) FROM `{$branches_table}`");
-
-        // If no branches exist, trigger sync
-        if ($count == 0) {
-            // Don't sync during install, let admin do it manually
-            // This prevents timeouts during plugin activation
-        }
+        error_log('WC Balíkovna: Tables created');
     }
 
     /**
@@ -91,69 +73,75 @@ class WC_Balikovna_Install
     {
         global $wpdb;
 
+        error_log('=== WC Balíkovna: Starting sync_data ===');
+
         $branches_table = $wpdb->prefix . 'balikovna_branches';
         $hours_table = $wpdb->prefix . 'balikovna_opening_hours';
 
-        // DEBUG: Logging start
-        error_log('=== WC Balíkovna: Začátek synchronizace ===');
-        error_log('API URL: ' . WC_BALIKOVNA_API_URL);
-        error_log('Branches table: ' . $branches_table);
-        error_log('Hours table: ' . $hours_table);
-        
-        // Check if tables exist
-        $tables_exist = $wpdb->get_var("SHOW TABLES LIKE '{$branches_table}'");
-        error_log('Table exists: ' . ($tables_exist ? 'YES' : 'NO'));
+        // Check if API URL is defined
+        if (!defined('WC_BALIKOVNA_API_URL')) {
+            error_log('WC Balíkovna ERROR: WC_BALIKOVNA_API_URL is not defined');
+            return new WP_Error('missing_constant', 'Konstanta WC_BALIKOVNA_API_URL není definována');
+        }
+
+        error_log('WC Balíkovna: API URL: ' . WC_BALIKOVNA_API_URL);
 
         // Fetch XML data from Czech Post
-        error_log('Stahování XML z API...');
+        error_log('WC Balíkovna: Downloading XML...');
         $xml_data = wp_remote_get(WC_BALIKOVNA_API_URL, array(
             'timeout' => 60,
+            'sslverify' => true,
         ));
 
         if (is_wp_error($xml_data)) {
-            error_log('CHYBA při stahování: ' . $xml_data->get_error_message());
+            error_log('WC Balíkovna ERROR: ' . $xml_data->get_error_message());
             return $xml_data;
         }
 
+        $response_code = wp_remote_retrieve_response_code($xml_data);
+        error_log('WC Balíkovna: Response code: ' . $response_code);
+
         $body = wp_remote_retrieve_body($xml_data);
-        error_log('XML staženo. Velikost: ' . strlen($body) . ' bytů');
+        error_log('WC Balíkovna: Downloaded ' . strlen($body) . ' bytes');
         
         if (empty($body)) {
-            error_log('CHYBA: Prázdná odpověď z API');
+            error_log('WC Balíkovna ERROR: Empty response body');
             return new WP_Error('empty_response', __('Prázdná odpověď z API České pošty', 'wc-balikovna-komplet'));
         }
 
+        // Log first 500 characters of response for debugging
+        error_log('WC Balíkovna: Response preview: ' . substr($body, 0, 500));
+
         // Parse XML
-        error_log('Parsování XML...');
         libxml_use_internal_errors(true);
         $xml = simplexml_load_string($body, 'SimpleXMLElement', LIBXML_NOCDATA);
 
         if ($xml === false) {
             $errors = libxml_get_errors();
-            error_log('CHYBA při parsování XML:');
+            $error_messages = array();
             foreach ($errors as $error) {
-                error_log('  - ' . $error->message);
+                $error_messages[] = $error->message;
             }
             libxml_clear_errors();
+            error_log('WC Balíkovna ERROR: XML parse errors: ' . implode(', ', $error_messages));
             return new WP_Error('xml_parse_error', __('Chyba při parsování XML dat', 'wc-balikovna-komplet'));
         }
 
-        $total_items = count($xml->row);
-        error_log('XML úspěšně parsováno. Počet položek v XML: ' . $total_items);
+        error_log('WC Balíkovna: XML parsed successfully');
+        error_log('WC Balíkovna: Found ' . count($xml->row) . ' rows in XML');
 
         // Clear existing data
-        error_log('Mazání starých dat...');
-        $wpdb->query("TRUNCATE TABLE $hours_table");
-        $wpdb->query("TRUNCATE TABLE $branches_table");
+        $wpdb->query("TRUNCATE TABLE `{$hours_table}`");
+        $wpdb->query("TRUNCATE TABLE `{$branches_table}`");
+        error_log('WC Balíkovna: Tables truncated');
 
         $branches_count = 0;
         $hours_count = 0;
 
         // Process each branch
-        error_log('Zpracování poboček...');
         foreach ($xml->row as $item) {
             // Insert branch
-            $result = $wpdb->insert(
+            $insert_result = $wpdb->insert(
                 $branches_table,
                 array(
                     'name' => sanitize_text_field((string)$item->NAZEV),
@@ -168,18 +156,13 @@ class WC_Balikovna_Install
                 array('%s', '%s', '%s', '%s', '%s', '%f', '%f', '%s')
             );
 
-            if ($result === false) {
-                error_log('CHYBA při vkládání pobočky: ' . $wpdb->last_error);
+            if ($insert_result === false) {
+                error_log('WC Balíkovna ERROR: Failed to insert branch: ' . $wpdb->last_error);
                 continue;
             }
 
             $branch_id = $wpdb->insert_id;
             $branches_count++;
-
-            // Log progress every 100 branches
-            if ($branches_count % 100 === 0) {
-                error_log('Zpracováno ' . $branches_count . ' / ' . $total_items . ' poboček...');
-            }
 
             // Process opening hours
             if (isset($item->OTEV_DOBY) && isset($item->OTEV_DOBY->den)) {
@@ -187,39 +170,18 @@ class WC_Balikovna_Install
                     $day_name = (string)$day['name'];
 
                     if (isset($day->od_do)) {
-                        // Handle multiple time ranges
-                        if (is_array($day->od_do) || count($day->od_do) > 1) {
-                            foreach ($day->od_do as $time_range) {
-                                $from = (string)$time_range->od;
-                                $to = (string)$time_range->do;
-                                
-                                if (!empty($from) && !empty($to)) {
-                                    $wpdb->insert(
-                                        $hours_table,
-                                        array(
-                                            'branch_id' => $branch_id,
-                                            'day_name' => sanitize_text_field($day_name),
-                                            'open_from' => sanitize_text_field($from),
-                                            'open_to' => sanitize_text_field($to),
-                                        ),
-                                        array('%d', '%s', '%s', '%s')
-                                    );
-                                    $hours_count++;
-                                }
-                            }
-                        } else {
-                            // Single time range
-                            $from = (string)$day->od_do->od;
-                            $to = (string)$day->od_do->do;
-                            
-                            if (!empty($from) && !empty($to)) {
+                        foreach ($day->od_do as $hours) {
+                            $open_from = (string)$hours['od'];
+                            $open_to = (string)$hours['do'];
+
+                            if (!empty($open_from) && !empty($open_to)) {
                                 $wpdb->insert(
                                     $hours_table,
                                     array(
                                         'branch_id' => $branch_id,
-                                        'day_name' => sanitize_text_field($day_name),
-                                        'open_from' => sanitize_text_field($from),
-                                        'open_to' => sanitize_text_field($to),
+                                        'day_name' => $day_name,
+                                        'open_from' => $open_from,
+                                        'open_to' => $open_to,
                                     ),
                                     array('%d', '%s', '%s', '%s')
                                 );
@@ -229,19 +191,19 @@ class WC_Balikovna_Install
                     }
                 }
             }
+
+            // Log progress every 100 branches
+            if ($branches_count % 100 == 0) {
+                error_log('WC Balíkovna: Processed ' . $branches_count . ' branches...');
+            }
         }
 
-        error_log('=== Synchronizace dokončena ===');
-        error_log('Importováno poboček: ' . $branches_count);
-        error_log('Importováno otevíracích hodin: ' . $hours_count);
+        error_log('WC Balíkovna: Sync completed - ' . $branches_count . ' branches, ' . $hours_count . ' opening hours');
+        error_log('=== WC Balíkovna: Sync finished successfully ===');
 
-        // Update cache timestamp
-        set_transient('wc_balikovna_branches_timestamp', current_time('mysql'), DAY_IN_SECONDS);
-        delete_transient('wc_balikovna_branches_cache');
+        // Save timestamp
+        update_option('wc_balikovna_last_sync', time());
 
-        return array(
-            'branches' => $branches_count,
-            'hours' => $hours_count,
-        );
+        return true;
     }
 }

@@ -143,50 +143,55 @@ class WC_Balikovna_Checkout
                 <div id="wc-balikovna-selected-details"></div>
             </div>
         </div>
-        <script>
-        jQuery(function($) {
-            // Listen for postMessage from iframe
-            window.addEventListener('message', function(event) {
-                // Verify origin
-                if (event.origin !== 'https://b2c.cpost.cz') {
-                    return;
-                }
+<script>
+jQuery(function($) {
+    // Listen for postMessage from iframe
+    window.addEventListener('message', function(event) {
+        // Verify origin
+        if (event.origin !== 'https://b2c.cpost.cz') {
+            return;
+        }
+        
+        // Check if this is the picker result - API České pošty vrací "point", ne "branch"!
+        if (event.data && 
+            typeof event.data === 'object' && 
+            event.data.message === 'pickerResult' &&
+            event.data.point &&
+            typeof event.data.point === 'object') {
+            
+            var point = event.data.point; // Změněno z event.data.branch na event.data.point
+            
+            if (point) {
+                // Create branch data object
+                var branchData = {
+                    id: point.id || '',
+                    name: point.name || '',
+                    city: point.municipality_name || point.city || '',  // API vrací municipality_name
+                    city_part: point.city_part || '',
+                    address: point.address || '',
+                    zip: point.zip || '',
+                    kind: point.kind || ''
+                };
                 
-                // Check if this is the picker result with proper message structure validation
-                if (event.data && 
-                    typeof event.data === 'object' && 
-                    event.data.message === 'pickerResult' &&
-                    event.data.branch &&
-                    typeof event.data.branch === 'object') {
-                    var branch = event.data.branch;
-                    if (branch) {
-                        // Create branch data object
-                        var branchData = {
-                            id: branch.id || '',
-                            name: branch.name || '',
-                            city: branch.city || '',
-                            city_part: branch.city_part || '',
-                            address: branch.address || '',
-                            zip: branch.zip || '',
-                            kind: branch.kind || ''
-                        };
-                        
-                        // Save to hidden field as JSON
-                        $('#wc_balikovna_branch').val(JSON.stringify(branchData));
-                        
-                        // Display selected branch info
-                        var infoHtml = '<p style="margin: 5px 0;">' +
-                            '<strong>' + branchData.name + '</strong><br>' +
-                            branchData.address + ', ' + branchData.zip + ' ' + branchData.city +
-                            (branchData.city_part ? ' - ' + branchData.city_part : '') +
-                            '</p>';
-                        $('#wc-balikovna-selected-details').html(infoHtml);
-                        $('#wc-balikovna-selected-info').show();
-                    }
-                }
-            }, false);
-        });
-        </script>
+                // Save to hidden field as JSON
+                $('#wc_balikovna_branch').val(JSON.stringify(branchData));
+                
+                // Display selected branch info
+                var infoHtml = '<p style="margin: 5px 0;">' +
+                    '<strong>' + branchData.name + '</strong><br>' +
+                    branchData.address + ', ' + branchData.zip + ' ' + branchData.city +
+                    (branchData.city_part ? ' - ' + branchData.city_part : '') +
+                    '</p>';
+                $('#wc-balikovna-selected-details').html(infoHtml);
+                $('#wc-balikovna-selected-info').show();
+                
+                // Oznámení WooCommerce, že se změnila adresa (jako ve starém pluginu)
+                $(document.body).trigger('update_checkout');
+            }
+        }
+    }, false);
+});
+</script>
         <?php
     }
 
@@ -199,7 +204,7 @@ class WC_Balikovna_Checkout
         <div class="wc-balikovna-address-notice" style="margin-top: 15px; padding: 15px; background: #f0f8ff; border: 1px solid #b3d9ff; border-radius: 4px;">
             <p style="margin: 0;">
                 <strong><?php echo esc_html__('Doručení na adresu', 'wc-balikovna-komplet'); ?></strong><br>
-                <?php echo esc_html__('Balík bude doručen na vámi uvedenou dodací adresu.', 'wc-balikovna-komplet'); ?>
+                <?php echo esc_html__('Balík bude doručen na Tebou uvedenou dodací adresu, viz. níže.', 'wc-balikovna-komplet'); ?>
             </p>
             <input type="hidden" name="wc_balikovna_delivery_type" value="address">
         </div>

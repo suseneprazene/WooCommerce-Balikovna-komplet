@@ -75,11 +75,61 @@ class WC_Balikovna_API
      */
     public function search_branches($request)
     {
+        global $wpdb;
+        
         $term = sanitize_text_field($request->get_param('q'));
+        
+        // Debug: Log request
+        error_log('WC Balíkovna API: Search request with term: "' . $term . '"');
+        
+        // Check if table exists
+        $branches_table = $wpdb->prefix . 'balikovna_branches';
+        $table_exists = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = %s AND table_name = %s",
+            DB_NAME,
+            $branches_table
+        ));
+        
+        if (!$table_exists) {
+            error_log('WC Balíkovna API: ERROR - Table does not exist: ' . $branches_table);
+            return new WP_REST_Response(array(
+                'branches' => array(),
+                'error' => 'Tabulka poboček neexistuje. Spusťte synchronizaci dat.',
+                'debug' => array(
+                    'table' => $branches_table,
+                    'exists' => false
+                )
+            ), 200);
+        }
+        
+        // Check row count
+        $count = $wpdb->get_var("SELECT COUNT(*) FROM `{$branches_table}`");
+        error_log('WC Balíkovna API: Table row count: ' . $count);
+        
+        if ($count == 0) {
+            error_log('WC Balíkovna API: WARNING - Table is empty');
+            return new WP_REST_Response(array(
+                'branches' => array(),
+                'error' => 'Databáze poboček je prázdná. Spusťte synchronizaci dat v nastavení.',
+                'debug' => array(
+                    'table' => $branches_table,
+                    'exists' => true,
+                    'count' => 0
+                )
+            ), 200);
+        }
+        
         $branches = $this->get_branches($term);
+        
+        error_log('WC Balíkovna API: Returned ' . count($branches) . ' branches');
 
         return new WP_REST_Response(array(
             'branches' => $branches,
+            'debug' => array(
+                'term' => $term,
+                'count' => count($branches),
+                'total_in_db' => $count
+            )
         ), 200);
     }
 
@@ -136,7 +186,7 @@ class WC_Balikovna_API
     }
 
     /**
-     * Get branches from database with caching
+     * Get branches from database
      *
      * @param string $term Search term
      * @return array
@@ -147,61 +197,56 @@ class WC_Balikovna_API
 
         $branches_table = $wpdb->prefix . 'balikovna_branches';
         
-        // DEBUG: Log search request
-        error_log('WC Balíkovna API: Searching branches with term: ' . ($term ? $term : '(empty)'));
-        
-        // Try cache first for empty searches
+        // Build query
         if (empty($term)) {
-            $cache_key = 'wc_balikovna_branches_cache';
-            $cached = get_transient($cache_key);
+            // Return first 50 branches if no search term
+            $sql = $wpdb->prepare(
+                "SELECT id, name, city, city_part, address, zip, kind 
+                FROM `{$branches_table}` 
+                ORDER BY city, city_part 
+                LIMIT %d",
+                50
+            );
+        } elseif (ctype_digit($term)) {
+            // Search by ZIP code
+            $sql = $wpdb->prepare(
+                "SELECT id, name, city, city_part, address, zip, kind 
+                FROM `{$branches_table}` 
+                WHERE zip LIKE %s 
+                ORDER BY city, city_part",
+                $term . '%'
+            );
+        } else {
+            // Search by city, city_part, or address
+            $search_term = '%' . $wpdb->esc_like($term) . '%';
+            $search_start = $wpdb->esc_like($term) . '%';
             
-            if ($cached !== false) {
-                error_log('WC Balíkovna API: Returning ' . count($cached) . ' cached branches');
-                return $cached;
-            }
+            $sql = $wpdb->prepare(
+                "SELECT id, name, city, city_part, address, zip, kind 
+                FROM `{$branches_table}` 
+                WHERE city LIKE %s 
+                   OR city_part LIKE %s 
+                   OR address LIKE %s 
+                ORDER BY 
+                    CASE 
+                        WHEN city LIKE %s THEN 1
+                        WHEN city_part LIKE %s THEN 2
+                        ELSE 3
+                    END,
+                    city, city_part 
+                LIMIT 50",
+                $search_term,
+                $search_term,
+                $search_term,
+                $search_start,
+                $search_start
+            );
         }
-
-        $sql = "SELECT id, name, city, city_part, address, zip, kind FROM `{$branches_table}`";
-        $where = array();
-        $params = array();
-
-        if (!empty($term)) {
-            if (ctype_digit($term)) {
-                // Search by ZIP code
-                $where[] = "zip LIKE %s";
-                $params[] = $term . '%';
-            } else {
-                // Search by city, city_part, or address
-                $where[] = "(city LIKE %s OR city LIKE %s OR city_part LIKE %s OR city_part LIKE %s OR address LIKE %s OR address LIKE %s)";
-                $params[] = $term . '%';
-                $params[] = '% ' . $term . '%';
-                $params[] = $term . '%';
-                $params[] = '% ' . $term . '%';
-                $params[] = $term . '%';
-                $params[] = '% ' . $term . '%';
-            }
-        }
-
-        if (!empty($where)) {
-            $sql .= " WHERE " . implode(' AND ', $where);
-        }
-
-        $sql .= " ORDER BY city, city_part LIMIT 50";
-
-        if (!empty($params)) {
-            $sql = $wpdb->prepare($sql, $params);
-        }
-
-        error_log('WC Balíkovna API: SQL query: ' . $sql);
 
         $results = $wpdb->get_results($sql, ARRAY_A);
-
-        if ($wpdb->last_error) {
-            error_log('WC Balíkovna API: SQL error: ' . $wpdb->last_error);
-        }
-
-        error_log('WC Balíkovna API: Found ' . count($results) . ' branches');
-
+        
+        error_log('WC Balíkovna get_branches: SQL returned ' . count($results) . ' rows');
+        
         if (empty($results)) {
             return array();
         }
@@ -218,11 +263,6 @@ class WC_Balikovna_API
                 'zip' => $row['zip'],
                 'kind' => $row['kind'],
             );
-        }
-
-        // Cache empty search results
-        if (empty($term)) {
-            set_transient('wc_balikovna_branches_cache', $branches, DAY_IN_SECONDS);
         }
 
         return $branches;

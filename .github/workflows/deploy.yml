@@ -19,4 +19,4 @@ jobs:
         server: ${{ secrets.FTP_SERVER }}
         username: ${{ secrets.FTP_USERNAME }}
         password: ${{ secrets.FTP_PASSWORD }}
-        server-dir: www/wp-content/plugins/WooCommerce-Balikovna-komplet/
+        server-dir: /wp-content/plugins/WooCommerce-Balikovna-komplet/
