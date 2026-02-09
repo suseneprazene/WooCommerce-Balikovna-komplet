@@ -187,8 +187,22 @@ class WC_Balikovna_Admin
         global $wpdb;
 
         $branches_table = $wpdb->prefix . 'balikovna_branches';
-        $branches_count = $wpdb->get_var("SELECT COUNT(*) FROM `{$branches_table}`");
-        $last_sync = get_option('wc_balikovna_last_sync');
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = %s AND table_name = %s",
+            DB_NAME,
+            $branches_table
+        ));
+        
+        $branches_count = 0;
+        if ($table_exists) {
+            $branches_count = $wpdb->get_var("SELECT COUNT(*) FROM `{$branches_table}`");
+        }
+        
+        $last_sync = get_option('balikovna_last_update');
+        $last_count = get_option('balikovna_last_count');
+        $last_error = get_option('balikovna_last_update_error');
 
         ?>
         <table class="form-table">
@@ -197,21 +211,48 @@ class WC_Balikovna_Admin
                     <label><?php esc_html_e('Statistiky', 'wc-balikovna-komplet'); ?></label>
                 </th>
                 <td class="forminp">
-                    <p>
-                        <strong><?php esc_html_e('Počet poboček v databázi:', 'wc-balikovna-komplet'); ?></strong>
-                        <?php echo intval($branches_count); ?>
-                    </p>
-                    <?php if ($last_sync) : ?>
-                        <p>
-                            <strong><?php esc_html_e('Poslední synchronizace:', 'wc-balikovna-komplet'); ?></strong>
-                            <?php echo esc_html(date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $last_sync)); ?>
+                    <?php if (!$table_exists) : ?>
+                        <p style="color: #dc3232;">
+                            <strong><?php esc_html_e('⚠ Databázová tabulka neexistuje!', 'wc-balikovna-komplet'); ?></strong><br>
+                            <?php esc_html_e('Klikněte na tlačítko "Aktualizovat data poboček" níže pro vytvoření tabulky a import dat.', 'wc-balikovna-komplet'); ?>
                         </p>
                     <?php else : ?>
                         <p>
-                            <strong><?php esc_html_e('Poslední synchronizace:', 'wc-balikovna-komplet'); ?></strong>
-                            <?php esc_html_e('Nikdy', 'wc-balikovna-komplet'); ?>
+                            <strong><?php esc_html_e('Počet poboček v databázi:', 'wc-balikovna-komplet'); ?></strong>
+                            <span style="<?php echo $branches_count === 0 ? 'color: #dc3232; font-weight: bold;' : 'color: #46b450; font-weight: bold;'; ?>">
+                                <?php echo intval($branches_count); ?>
+                            </span>
+                            <?php if ($branches_count === 0) : ?>
+                                <span style="color: #dc3232;">
+                                    <?php esc_html_e('(Nebyla provedena synchronizace nebo importována žádná data)', 'wc-balikovna-komplet'); ?>
+                                </span>
+                            <?php endif; ?>
                         </p>
                     <?php endif; ?>
+                    
+                    <?php if ($last_sync) : ?>
+                        <p>
+                            <strong><?php esc_html_e('Poslední aktualizace:', 'wc-balikovna-komplet'); ?></strong>
+                            <?php echo esc_html(date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $last_sync)); ?>
+                            <?php if ($last_count) : ?>
+                                <br>
+                                <em><?php echo sprintf(esc_html__('(Importováno %d poboček)', 'wc-balikovna-komplet'), intval($last_count)); ?></em>
+                            <?php endif; ?>
+                        </p>
+                    <?php else : ?>
+                        <p>
+                            <strong><?php esc_html_e('Poslední aktualizace:', 'wc-balikovna-komplet'); ?></strong>
+                            <span style="color: #dc3232;"><?php esc_html_e('Nikdy', 'wc-balikovna-komplet'); ?></span>
+                        </p>
+                    <?php endif; ?>
+                    
+                    <?php if ($last_error) : ?>
+                        <p style="padding: 10px; background: #fff3cd; border-left: 4px solid #dc3232; margin: 10px 0;">
+                            <strong style="color: #dc3232;"><?php esc_html_e('Poslední chyba:', 'wc-balikovna-komplet'); ?></strong><br>
+                            <?php echo esc_html($last_error); ?>
+                        </p>
+                    <?php endif; ?>
+                    
                     <p>
                         <strong><?php esc_html_e('API URL:', 'wc-balikovna-komplet'); ?></strong>
                         <code><?php echo esc_html(WC_BALIKOVNA_API_URL); ?></code>
@@ -226,7 +267,7 @@ class WC_Balikovna_Admin
                     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                         <input type="hidden" name="action" value="wc_balikovna_sync">
                         <?php wp_nonce_field('wc_balikovna_sync'); ?>
-                        <?php submit_button(__('Aktualizovat data poboček', 'wc-balikovna-komplet'), 'primary', 'submit', false); ?>
+                        <?php submit_button(__('Aktualizovat pobočky', 'wc-balikovna-komplet'), 'primary', 'submit', false); ?>
                     </form>
                     <p class="description">
                         <?php esc_html_e('Načte aktuální data poboček z API České pošty. Proces může trvat několik minut.', 'wc-balikovna-komplet'); ?>

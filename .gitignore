@@ -53,3 +53,6 @@ $RECYCLE.BIN/
 .env
 .env.local
 .env.*.local
+
+# FTP Deploy
+.ftp-deploy-sync-state.json
