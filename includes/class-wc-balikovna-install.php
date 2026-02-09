@@ -95,7 +95,7 @@ class WC_Balikovna_Install
         error_log('WC Balíkovna: Downloading XML...');
         $xml_data = wp_remote_get(WC_BALIKOVNA_API_URL, array(
             'timeout' => 60,
-            'sslverify' => false, // Note: Czech Post certificate may have issues on some servers
+            'sslverify' => true, // Enable SSL verification for security
         ));
 
         if (is_wp_error($xml_data)) {

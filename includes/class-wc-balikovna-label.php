@@ -307,25 +307,14 @@ class WC_Balikovna_Label
         }
 
         // Validate required order data
-        $missing_fields = array();
-        
-        if (empty($order->get_billing_first_name()) && empty($order->get_billing_last_name())) {
-            $missing_fields[] = 'Jméno zákazníka';
-        }
-        if (empty($order->get_billing_email())) {
-            $missing_fields[] = 'Email zákazníka';
-        }
-        if (empty($order->get_billing_phone())) {
-            $missing_fields[] = 'Telefon zákazníka';
-        }
-        
-        if (!empty($missing_fields)) {
-            error_log('WC Balíkovna Label ERROR: Missing order fields: ' . implode(', ', $missing_fields));
+        $validation = $this->validate_order_data($order);
+        if (!$validation['valid']) {
+            error_log('WC Balíkovna Label ERROR: Missing order fields: ' . implode(', ', $validation['missing_fields']));
             return array(
                 'success' => false,
                 'message' => sprintf(
                     __('Chybí údaje objednávky: %s', 'wc-balikovna-komplet'),
-                    implode(', ', $missing_fields)
+                    implode(', ', $validation['missing_fields'])
                 )
             );
         }
@@ -336,7 +325,7 @@ class WC_Balikovna_Label
             'branchId' => $branch_id,
             'branchName' => $branch_name,
             'orderNumber' => $order->get_order_number(),
-            'customerName' => trim($order->get_billing_first_name() . ' ' . $order->get_billing_last_name()),
+            'customerName' => $this->get_customer_name($order),
             'customerEmail' => $order->get_billing_email(),
             'customerPhone' => $order->get_billing_phone(),
             'weight' => $this->calculate_order_weight($order),
@@ -401,25 +390,14 @@ class WC_Balikovna_Label
         }
         
         // Validate required order data
-        $missing_fields = array();
-        
-        if (empty($order->get_billing_first_name()) && empty($order->get_billing_last_name())) {
-            $missing_fields[] = 'Jméno zákazníka';
-        }
-        if (empty($order->get_billing_email())) {
-            $missing_fields[] = 'Email zákazníka';
-        }
-        if (empty($order->get_billing_phone())) {
-            $missing_fields[] = 'Telefon zákazníka';
-        }
-        
-        if (!empty($missing_fields)) {
-            error_log('WC Balíkovna Label ERROR: Missing order fields: ' . implode(', ', $missing_fields));
+        $validation = $this->validate_order_data($order);
+        if (!$validation['valid']) {
+            error_log('WC Balíkovna Label ERROR: Missing order fields: ' . implode(', ', $validation['missing_fields']));
             return array(
                 'success' => false,
                 'message' => sprintf(
                     __('Chybí údaje objednávky: %s', 'wc-balikovna-komplet'),
-                    implode(', ', $missing_fields)
+                    implode(', ', $validation['missing_fields'])
                 )
             );
         }
@@ -431,7 +409,7 @@ class WC_Balikovna_Label
             'city' => $city,
             'postcode' => $postcode,
             'orderNumber' => $order->get_order_number(),
-            'customerName' => trim($order->get_billing_first_name() . ' ' . $order->get_billing_last_name()),
+            'customerName' => $this->get_customer_name($order),
             'customerEmail' => $order->get_billing_email(),
             'customerPhone' => $order->get_billing_phone(),
             'weight' => $this->calculate_order_weight($order),
@@ -583,6 +561,43 @@ class WC_Balikovna_Label
             'message' => __('Štítek byl úspěšně vygenerován', 'wc-balikovna-komplet')
         );
         */
+    }
+
+    /**
+     * Validate required order data
+     *
+     * @param WC_Order $order
+     * @return array Array with 'valid' (bool) and 'missing_fields' (array)
+     */
+    private function validate_order_data($order)
+    {
+        $missing_fields = array();
+        
+        if (empty($order->get_billing_first_name()) && empty($order->get_billing_last_name())) {
+            $missing_fields[] = 'Jméno zákazníka';
+        }
+        if (empty($order->get_billing_email())) {
+            $missing_fields[] = 'Email zákazníka';
+        }
+        if (empty($order->get_billing_phone())) {
+            $missing_fields[] = 'Telefon zákazníka';
+        }
+        
+        return array(
+            'valid' => empty($missing_fields),
+            'missing_fields' => $missing_fields
+        );
+    }
+
+    /**
+     * Get formatted customer name from order
+     *
+     * @param WC_Order $order
+     * @return string
+     */
+    private function get_customer_name($order)
+    {
+        return trim($order->get_billing_first_name() . ' ' . $order->get_billing_last_name());
     }
 
     /**
