@@ -208,21 +208,21 @@ jQuery(function($) {
         // Generate label
         $result = $this->generate_label($order);
 
-if ($result['success']) {
-    $resp = array('message' => $result['message']);
-    if (isset($result['label_url'])) {
-        $resp['label_url'] = $result['label_url'];
-    } else {
-        // pokusíme se načíst uloženou meta (fallback)
-        $label_url = $order->get_meta('_wc_balikovna_label_url');
-        if (!empty($label_url)) {
-            $resp['label_url'] = $label_url;
+        if ($result['success']) {
+            $resp = array('message' => $result['message']);
+            if (isset($result['label_url'])) {
+                $resp['label_url'] = $result['label_url'];
+            } else {
+                // pokusíme se načíst uloženou meta (fallback)
+                $label_url = $order->get_meta('_wc_balikovna_label_url');
+                if (!empty($label_url)) {
+                    $resp['label_url'] = $label_url;
+                }
+            }
+            wp_send_json_success($resp);
+        } else {
+            wp_send_json_error(array('message' => $result['message']));
         }
-    }
-    wp_send_json_success($resp);
-} else {
-    wp_send_json_error(array('message' => $result['message']));
-}
     }
 
     /**
@@ -363,44 +363,45 @@ if ($result['success']) {
         
         error_log('WC Balíkovna Label: Prepared data: ' . json_encode($data));
 
-// --- Nahraď tento blok (místo volání API a zpracování výsledku) ---
-$prepared = $this->prepare_label_data( $order );
-if ( is_wp_error( $prepared ) ) {
-    return array(
-        'success' => false,
-        'message' => $prepared->get_error_message()
-    );
-}
+        // --- Nahraď tento blok (místo volání API a zpracování výsledku) ---
+        $prepared = $this->prepare_label_data( $order );
+        if ( is_wp_error( $prepared ) ) {
+            return array(
+                'success' => false,
+                'message' => $prepared->get_error_message()
+            );
+        }
 
-$pdf_result = $this->build_pdf_from_template( $prepared );
-if ( is_wp_error( $pdf_result ) ) {
-    return array(
-        'success' => false,
-        'message' => $pdf_result->get_error_message()
-    );
-}
+        $pdf_result = $this->build_pdf_from_template( $prepared );
+        if ( is_wp_error( $pdf_result ) ) {
+            return array(
+                'success' => false,
+                'message' => $pdf_result->get_error_message()
+            );
+        }
 
-if ( isset( $pdf_result['success'] ) && $pdf_result['success'] && ! empty( $pdf_result['url'] ) ) {
-    // Save label info to order
-    $order->update_meta_data('_wc_balikovna_label_generated', 'yes');
-    $order->update_meta_data('_wc_balikovna_label_url', $pdf_result['url']);
-    $order->update_meta_data('_wc_balikovna_label_date', current_time('mysql'));
-    $order->save();
+        if ( isset( $pdf_result['success'] ) && $pdf_result['success'] && ! empty( $pdf_result['url'] ) ) {
+            // Save label info to order
+            $order->update_meta_data('_wc_balikovna_label_generated', 'yes');
+            $order->update_meta_data('_wc_balikovna_label_url', $pdf_result['url']);
+            $order->update_meta_data('_wc_balikovna_label_date', current_time('mysql'));
+            $order->save();
 
-    error_log('WC Balíkovna Label: Label saved to order meta (generated PDF)');
+            error_log('WC Balíkovna Label: Label saved to order meta (generated PDF)');
 
-    return array(
-        'success' => true,
-        'label_url' => $pdf_result['url'],
-        'message' => __('Štítek byl úspěšně vygenerován', 'wc-balikovna-komplet')
-    );
-} else {
-    return array(
-        'success' => false,
-        'message' => __('Chyba při generování PDF štítku', 'wc-balikovna-komplet')
-    );
-	} 
-}
+            return array(
+                'success' => true,
+                'label_url' => $pdf_result['url'],
+                'message' => __('Štítek byl úspěšně vygenerován', 'wc-balikovna-komplet')
+            );
+        } else {
+            return array(
+                'success' => false,
+                'message' => __('Chyba při generování PDF štítku', 'wc-balikovna-komplet')
+            );
+        } 
+    }
+
     /**
      * Generate label for Address delivery type
      *
@@ -461,540 +462,515 @@ if ( isset( $pdf_result['success'] ) && $pdf_result['success'] && ! empty( $pdf_
         
         error_log('WC Balíkovna Label: Prepared data: ' . json_encode($data));
 
-      // --- Nahraď tento blok (místo volání API a zpracování výsledku) ---
-$prepared = $this->prepare_label_data( $order );
-if ( is_wp_error( $prepared ) ) {
-    return array(
-        'success' => false,
-        'message' => $prepared->get_error_message()
-    );
-}
-
-$pdf_result = $this->build_pdf_from_template( $prepared );
-if ( is_wp_error( $pdf_result ) ) {
-    return array(
-        'success' => false,
-        'message' => $pdf_result->get_error_message()
-    );
-}
-
-if ( isset( $pdf_result['success'] ) && $pdf_result['success'] && ! empty( $pdf_result['url'] ) ) {
-    // Save label info to order
-    $order->update_meta_data('_wc_balikovna_label_generated', 'yes');
-    $order->update_meta_data('_wc_balikovna_label_url', $pdf_result['url']);
-    $order->update_meta_data('_wc_balikovna_label_date', current_time('mysql'));
-    $order->save();
-
-    error_log('WC Balíkovna Label: Label saved to order meta (generated PDF)');
-
-    return array(
-        'success' => true,
-        'label_url' => $pdf_result['url'],
-        'message' => __('Štítek byl úspěšně vygenerován', 'wc-balikovna-komplet')
-    );
-} else {
-    return array(
-        'success' => false,
-        'message' => __('Chyba při generování PDF štítku', 'wc-balikovna-komplet')
-    );
-	} 
-}
-
-// --- Přidat: pomocné metody pro přípravu dat a generování PDF (vložit PŘED metodou call_api) ---
-
-/**
- * Připraví data pro štítek z objednávky.
- *
- * @param int|WC_Order $order_or_id
- * @return array|WP_Error
- */
-private function prepare_label_data( $order_or_id ) {
-    $order = is_object( $order_or_id ) ? $order_or_id : wc_get_order( intval( $order_or_id ) );
-
-    if ( ! $order ) {
-        return new WP_Error( 'order_not_found', 'Objednávka nenalezena' );
-    }
-
-    // Odesílatel (možno upravit z nastavení pluginu)
-    $sender = array(
-        'name'         => get_option( 'wc_balikovna_sender_name', 'SU~PR sušené | pražené' ),
-        'order_number' => $order->get_order_number() ?: $order->get_id(),
-    );
-
-// Příjemce (ze shipping, fallback na billing)
-$recipient = array(
-    'name'     => trim( $order->get_shipping_first_name() . ' ' . $order->get_shipping_last_name() ),
-    'street'   => $order->get_shipping_address_1() ?: $order->get_billing_address_1(),
-    'address_2'=> $order->get_shipping_address_2() ?: $order->get_meta('shipping_address_2') ?: '',
-    'city'     => $order->get_shipping_city() ?: $order->get_billing_city(),
-    'zipCode'  => $order->get_shipping_postcode() ?: $order->get_billing_postcode(),
-);
-
-    if ( empty( $recipient['name'] ) || empty( $recipient['street'] ) || empty( $recipient['city'] ) || empty( $recipient['zipCode'] ) ) {
-        return new WP_Error( 'missing_recipient', 'Chybí některé povinné údaje příjemce' );
-    }
-
-    // Spočítat hmotnost (WooCommerce: obvykle v kg)
-    $weight = 0.0;
-    foreach ( $order->get_items() as $item ) {
-        $product = $item->get_product();
-        $qty     = $item->get_quantity();
-        if ( $product ) {
-            $prod_weight = $product->get_weight();
-            $prod_weight = $prod_weight ? floatval( $prod_weight ) : 0.0;
-            $weight += $prod_weight * $qty;
+        // --- Nahraď tento blok (místo volání API a zpracování výsledku) ---
+        $prepared = $this->prepare_label_data( $order );
+        if ( is_wp_error( $prepared ) ) {
+            return array(
+                'success' => false,
+                'message' => $prepared->get_error_message()
+            );
         }
-    }
-    if ( $weight <= 0 ) {
-        $weight = 1.0;
-    }
 
-    return array(
-        'sender'    => $sender,
-        'recipient' => $recipient,
-        'weight'    => number_format( $weight, 3, '.', '' ),
-    );
-}
-
-/**
- * Vytvoří PDF štítek z template (FPDI + TCPDF nebo FPDI+FPDF fallback).
- *
- * @param array $data Výstup z prepare_label_data()
- * @return array|WP_Error ['success'=>true,'url'=>'...'] nebo WP_Error
- */
-private function build_pdf_from_template( $data ) {
-	// --- TEST: jednoduché rychlé PDF (izolace zápisu) ---
-try {
-    // pokusíme se použít TCPDF pokud existuje
-    if ( class_exists('\TCPDF') ) {
-        $upload_dir = wp_upload_dir();
-        $dir = trailingslashit( $upload_dir['basedir'] ) . 'wc-balikovna-labels';
-        if ( ! file_exists( $dir ) ) {
-            wp_mkdir_p( $dir );
-            error_log('WC Balíkovna DEBUG: Created labels dir: ' . $dir);
+        $pdf_result = $this->build_pdf_from_template( $prepared );
+        if ( is_wp_error( $pdf_result ) ) {
+            return array(
+                'success' => false,
+                'message' => $pdf_result->get_error_message()
+            );
         }
-        $test_file = trailingslashit( $dir ) . 'test_simple_' . time() . '.pdf';
+
+        if ( isset( $pdf_result['success'] ) && $pdf_result['success'] && ! empty( $pdf_result['url'] ) ) {
+            // Save label info to order
+            $order->update_meta_data('_wc_balikovna_label_generated', 'yes');
+            $order->update_meta_data('_wc_balikovna_label_url', $pdf_result['url']);
+            $order->update_meta_data('_wc_balikovna_label_date', current_time('mysql'));
+            $order->save();
+
+            error_log('WC Balíkovna Label: Label saved to order meta (generated PDF)');
+
+            return array(
+                'success' => true,
+                'label_url' => $pdf_result['url'],
+                'message' => __('Štítek byl úspěšně vygenerován', 'wc-balikovna-komplet')
+            );
+        } else {
+            return array(
+                'success' => false,
+                'message' => __('Chyba při generování PDF štítku', 'wc-balikovna-komplet')
+            );
+        } 
+    }
+
+    // --- Přidat: pomocné metody pro přípravu dat a generování PDF (vložit PŘED metodou call_api) ---
+
+    /**
+     * Připraví data pro štítek z objednávky.
+     *
+     * @param int|WC_Order $order_or_id
+     * @return array|WP_Error
+     */
+    private function prepare_label_data( $order_or_id ) {
+        $order = is_object( $order_or_id ) ? $order_or_id : wc_get_order( intval( $order_or_id ) );
+
+        if ( ! $order ) {
+            return new WP_Error( 'order_not_found', 'Objednávka nenalezena' );
+        }
+
+        // Odesílatel (možno upravit z nastavení pluginu)
+        $sender = array(
+            'name'         => get_option( 'wc_balikovna_sender_name', 'SU~PR sušené | pražené' ),
+            'order_number' => $order->get_order_number() ?: $order->get_id(),
+        );
+
+        // Příjemce (ze shipping, fallback na billing)
+        $recipient = array(
+            'name'     => trim( $order->get_shipping_first_name() . ' ' . $order->get_shipping_last_name() ),
+            'street'   => $order->get_shipping_address_1() ?: $order->get_billing_address_1(),
+            'address_2'=> $order->get_shipping_address_2() ?: $order->get_meta('shipping_address_2') ?: '',
+            'city'     => $order->get_shipping_city() ?: $order->get_billing_city(),
+            'zipCode'  => $order->get_shipping_postcode() ?: $order->get_billing_postcode(),
+        );
+
+        if ( empty( $recipient['name'] ) || empty( $recipient['street'] ) || empty( $recipient['city'] ) || empty( $recipient['zipCode'] ) ) {
+            return new WP_Error( 'missing_recipient', 'Chybí některé povinné údaje příjemce' );
+        }
+
+        // Spočítat hmotnost (převod podle nastavení WooCommerce na kg)
+        $weight_kg = $this->calculate_order_weight( $order );
+
+        return array(
+            'sender'    => $sender,
+            'recipient' => $recipient,
+            'weight'    => $weight_kg,
+        );
+    }
+
+    /**
+     * Vytvoří PDF štítek z template (FPDI + TCPDF nebo FPDI+FPDF fallback).
+     *
+     * @param array $data Výstup z prepare_label_data()
+     * @return array|WP_Error ['success'=>true,'url'=>'...'] nebo WP_Error
+     */
+    private function build_pdf_from_template( $data ) {
+        // --- TEST: jednoduché rychlé PDF (izolace zápisu) ---
         try {
-            $testPdf = new \TCPDF('P','mm','A4');
-            $testPdf->SetCreator('WC Balikovna Test');
-            $testPdf->SetAuthor(get_bloginfo('name'));
-            $testPdf->SetTitle('Test PDF');
-            $testPdf->SetPrintHeader(false);
-            $testPdf->SetPrintFooter(false);
-            $testPdf->AddPage();
-            // pro test nepoužívej diakritiku aby se vyloučil font problém
-            $testPdf->SetFont('helvetica','',12);
-            $testPdf->Write(0, 'TEST - tento text se má zobrazit v PDF. order:' . ($data['sender']['order_number'] ?? 'unknown'));
-            $testPdf->Output($test_file, 'F');
-            error_log('WC Balíkovna DEBUG: Test PDF generated: ' . $test_file);
-            // vrátíme úspěch, aby se proces zastavil a bylo jasné, že zápis funguje
-            return array('success' => true, 'url' => trailingslashit($upload_dir['baseurl']) . 'wc-balikovna-labels/' . basename($test_file), 'message' => 'Test PDF generated');
+            // pokusíme se použít TCPDF pokud existuje
+            if ( class_exists('\TCPDF') ) {
+                $upload_dir = wp_upload_dir();
+                $dir = trailingslashit( $upload_dir['basedir'] ) . 'wc-balikovna-labels';
+                if ( ! file_exists( $dir ) ) {
+                    wp_mkdir_p( $dir );
+                    error_log('WC Balíkovna DEBUG: Created labels dir: ' . $dir);
+                }
+                $test_file = trailingslashit( $dir ) . 'test_simple_' . time() . '.pdf';
+                try {
+                    $testPdf = new \TCPDF('P','mm','A4');
+                    $testPdf->SetCreator('WC Balikovna Test');
+                    $testPdf->SetAuthor(get_bloginfo('name'));
+                    $testPdf->SetTitle('Test PDF');
+                    $testPdf->SetPrintHeader(false);
+                    $testPdf->SetPrintFooter(false);
+                    $testPdf->AddPage();
+                    // pro test nepoužívej diakritiku aby se vyloučil font problém
+                    $testPdf->SetFont('helvetica','',12);
+                    $testPdf->Write(0, 'TEST - tento text se má zobrazit v PDF. order:' . ($data['sender']['order_number'] ?? 'unknown'));
+                    $testPdf->Output($test_file, 'F');
+                    error_log('WC Balíkovna DEBUG: Test PDF generated: ' . $test_file);
+                    // vrátíme úspěch, aby se proces zastavil a bylo jasné, že zápis funguje
+                    return array('success' => true, 'url' => trailingslashit($upload_dir['baseurl']) . 'wc-balikovna-labels/' . basename($test_file), 'message' => 'Test PDF generated');
+                } catch (Exception $e) {
+                    error_log('WC Balíkovna DEBUG: Test PDF exception: ' . $e->getMessage());
+                    // pokud padne, pokračujeme do normálního flow
+                }
+            } else {
+                error_log('WC Balíkovna DEBUG: TCPDF class not found (class_exists returned false).');
+            }
         } catch (Exception $e) {
-            error_log('WC Balíkovna DEBUG: Test PDF exception: ' . $e->getMessage());
-            // pokud padne, pokračujeme do normálního flow
+            error_log('WC Balíkovna DEBUG: Unexpected test exception: ' . $e->getMessage());
         }
-    } else {
-        error_log('WC Balíkovna DEBUG: TCPDF class not found (class_exists returned false).');
-    }
-} catch (Exception $e) {
-    error_log('WC Balíkovna DEBUG: Unexpected test exception: ' . $e->getMessage());
-}
-    $autoload = WC_BALIKOVNA_PLUGIN_DIR . 'vendor/autoload.php';
-    $tcpdf_in_plugin = WC_BALIKOVNA_PLUGIN_DIR . 'tcpdf/tcpdf.php';
-    $fpdi_in_plugin = WC_BALIKOVNA_PLUGIN_DIR . 'fpdi/src/autoload.php';
+        $autoload = WC_BALIKOVNA_PLUGIN_DIR . 'vendor/autoload.php';
+        $tcpdf_in_plugin = WC_BALIKOVNA_PLUGIN_DIR . 'tcpdf/tcpdf.php';
+        $fpdi_in_plugin = WC_BALIKOVNA_PLUGIN_DIR . 'fpdi/src/autoload.php';
 
-    if ( file_exists( $autoload ) ) {
-        require_once $autoload;
-    } else {
-        if ( file_exists( $fpdi_in_plugin ) ) {
-            require_once $fpdi_in_plugin;
-        }
-        if ( file_exists( $tcpdf_in_plugin ) ) {
-            require_once $tcpdf_in_plugin;
-        }
-    }
-
-    if ( ! class_exists( '\setasign\Fpdi\Tcpdf\Fpdi' ) && ! class_exists( '\setasign\Fpdi\Fpdi' ) ) {
-        return new WP_Error( 'missing_lib', 'FPDI/TCPDF knihovny nejsou dostupné. Nainstalujte závislosti (composer require setasign/fpdi-tcpdf) nebo přidejte knihovny do pluginu.' );
-    }
-
-    try {
-        $template_path = WC_BALIKOVNA_PLUGIN_DIR . 'assets/BAL_stitek_HD_balikovna.pdf';
-        if ( ! file_exists( $template_path ) ) {
-            return new WP_Error( 'template_missing', 'Šablona PDF nebyla nalezena: assets/template.pdf' );
-        }
-
-        // Instantiate appropriate FPDI class
-        if ( class_exists( '\setasign\Fpdi\Tcpdf\Fpdi' ) ) {
-            $pdf = new \setasign\Fpdi\Tcpdf\Fpdi();
-        } elseif ( class_exists( '\setasign\Fpdi\Fpdi' ) ) {
-            $pdf = new \setasign\Fpdi\Fpdi();
+        if ( file_exists( $autoload ) ) {
+            require_once $autoload;
         } else {
-            return new WP_Error( 'no_pdf_engine', 'Nevhodná PDF knihovna' );
-        }
-
-        // Metadata (pokud dostupné)
-        if ( method_exists( $pdf, 'SetCreator' ) ) {
-            $pdf->SetCreator( 'WooCommerce Balíkovna' );
-            $pdf->SetAuthor( get_bloginfo( 'name' ) );
-            $pdf->SetTitle( 'Balíkovna - Adresní štítek' );
-        }
-        if ( method_exists( $pdf, 'SetPrintHeader' ) ) {
-            $pdf->SetPrintHeader( false );
-            $pdf->SetPrintFooter( false );
-        }
-
-        // Načteme template a vykreslíme
-        $pageCount = $pdf->setSourceFile( $template_path );
-        $tplId = $pdf->importPage( 1 );
-
-        $pdf->AddPage();
-        $pdf->useTemplate( $tplId, 0, 0 );
-
-        // Font (TCPDF podporuje UTF-8)
-        if ( method_exists( $pdf, 'SetFont' ) ) {
-            $pdf->SetFont( 'dejavusans', '', 10 );
-        }
-
-        $maxWidth = 85; // uprav dle šablony
-
-        // --- Vykreslení polí (souřadnice uprav podle vaší šablony) ---
-   // --- START: Výpis odesílatele — 4 řádky, co největším písmem do šířky $maxWidth ---
-$senderX = 12; // uprav X pozici podle potřeby (mm)
-$senderY = 17; // uprav Y pozici podle potřeby (mm)
-
-// První řádek: Obj. č. {číslo} z SU~PR sušené | pražené
-$order_number_display = '';
-if ( isset( $data['sender']['order_number'] ) && ! empty( $data['sender']['order_number'] ) ) {
-    $order_number_display = $data['sender']['order_number'];
-} elseif ( isset( $order ) && is_object( $order ) ) {
-    $order_number_display = $order->get_id();
-}
-
-$sender_lines = array(
-    'Obj. č. ' . $order_number_display . ' z SU~PR sušené | pražené',
-    'Petrašovice 61',
-    'Bílá - Petrašovice',
-    '463 42',
-);
-
-// Font a počáteční velikost (mm jednotky používá TCPDF v bodech fontSize)
-$font_family = 'dejavusans';
-$font_style = '';
-$fontSize = 10; // počáteční velikost — bude snižována pokud se nevejde
-$minFontSize = 3; // minimální velikost které dovolíme
-$lineGap = 1; // mezera mezi řádky v mm (násobek fontSize použijeme níže)
-
-// Zajistíme, že GetStringWidth použije stejný font a velikost při měření
-// Pokud GetStringWidth nepodporuje čtvrtý parametr v tvé sestavě TCPDF, použij jen $pdf->GetStringWidth($text) a uprav logiku.
-$fits = false;
-while ( $fontSize >= $minFontSize ) {
-    $tooWide = false;
-    foreach ( $sender_lines as $line ) {
-        // GetStringWidth(text, font, style, fontsize) - vrací šířku v aktuálních jednotkách (mm)
-        $w = $pdf->GetStringWidth( $line, $font_family, $font_style, $fontSize );
-        if ( $w > $maxWidth ) {
-            $tooWide = true;
-            break;
-        }
-    }
-    if ( ! $tooWide ) {
-        $fits = true;
-        break;
-    }
-    $fontSize -= 1; // snižujeme o 1 pt dokud se to nevejde
-}
-
-// Pokud se nic nevejde i při minFontSize, ořízneme text (truncation) nebo zmenšíme ještě víc
-if ( ! $fits ) {
-    // fallback: použij minFontSize a případně zkrátit první řádek pokud je potřeba
-    $fontSize = $minFontSize;
-    // volitelně: můžeme zkrátit první řádek, aby se vešel
-    $first = $sender_lines[0];
-    while ( $pdf->GetStringWidth( $first, $font_family, $font_style, $fontSize ) > $maxWidth && mb_strlen($first) > 3 ) {
-        $first = mb_substr( $first, 0, mb_strlen($first) - 1 );
-    }
-    if ( mb_strlen($first) < mb_strlen($sender_lines[0]) ) {
-        $first = rtrim( $first ) . '…';
-        $sender_lines[0] = $first;
-    }
-}
-
-// Nastavíme font a vykreslíme řádky
-$pdf->SetFont( $font_family, $font_style, $fontSize );
-$pdf->SetTextColor( 0, 0, 0 );
-
-// spočítáme výšku jednoho řádku (přibližně)
-// TCPDF používá font size v bodech; přepočet na mm pro řádkování: použijeme jednoduchý faktor
-$lineHeight = max(  ( $fontSize * 0.35 ), 4 ); // 0.35 ~ převod na mm přijatelný, 4mm min výška řádku
-
-$curY = $senderY;
-foreach ( $sender_lines as $line ) {
-    $pdf->SetXY( $senderX, $curY );
-    // Použijeme Cell přesně do šířky $maxWidth a zarovnání vlevo
-    $pdf->Cell( $maxWidth, $lineHeight, $line, 0, 1, 'L', 0, '', 0 );
-    $curY += $lineHeight + $lineGap;
-}
-
-// Posuň kurzor pod tuto sekci, aby další obsah nezačínal přes odesílatele
-$pdf->SetY( $curY + 1 ); // 1 mm mezera navíc
-// --- END: Výpis odesílatele ---
-
-// --- START: Sekce "Adresát" (1: jméno TUČNĚ; 2: shipping_address_2 nebo branch; 3: ulice+č.p.; 4: PSČ + město TUČNĚ) ---
-$recipientX = 12;
-$recipientY = 45; // původní pozice
-
-// Primární zdroj dat z $data
-$recipient_name = !empty($data['recipient']['name']) ? wp_strip_all_tags($data['recipient']['name']) : '';
-$address1 = !empty($data['recipient']['street']) ? wp_strip_all_tags($data['recipient']['street']) : '';
-$address2 = !empty($data['recipient']['address_2']) ? wp_strip_all_tags($data['recipient']['address_2']) : '';
-$city = !empty($data['recipient']['city']) ? wp_strip_all_tags($data['recipient']['city']) : '';
-$zip  = !empty($data['recipient']['zipCode']) ? wp_strip_all_tags($data['recipient']['zipCode']) : '';
-
-// Fallbacky: pokud chybí některé údaje, zkusíme objednávku podle sender.order_number
-$branch_id = !empty($data['recipient']['branch_id']) ? wp_strip_all_tags($data['recipient']['branch_id']) : '';
-$branch_name = !empty($data['recipient']['branch_name']) ? wp_strip_all_tags($data['recipient']['branch_name']) : '';
-
-if ( empty($address2) || empty($address1) || empty($city) || empty($zip) || empty($recipient_name) || ( empty($branch_id) && empty($branch_name) ) ) {
-    $order_candidate = null;
-    if ( ! empty( $data['sender']['order_number'] ) ) {
-        $on = $data['sender']['order_number'];
-        if ( is_numeric( $on ) ) {
-            $order_candidate = wc_get_order( intval( $on ) );
-        } else {
-            // někdy prepare_label_data může vrátit order_number jako text — zkus nejdřív ID, pak order number
-            $order_candidate = wc_get_order( intval( $on ) );
-        }
-    }
-    if ( $order_candidate ) {
-        if ( empty($recipient_name) ) {
-            $recipient_name = trim( $order_candidate->get_shipping_first_name() . ' ' . $order_candidate->get_shipping_last_name() );
-            if ( empty($recipient_name) ) {
-                $recipient_name = trim( $order_candidate->get_billing_first_name() . ' ' . $order_candidate->get_billing_last_name() );
+            if ( file_exists( $fpdi_in_plugin ) ) {
+                require_once $fpdi_in_plugin;
+            }
+            if ( file_exists( $tcpdf_in_plugin ) ) {
+                require_once $tcpdf_in_plugin;
             }
         }
-        if ( empty($address1) ) {
-            $address1 = $order_candidate->get_shipping_address_1() ?: $order_candidate->get_billing_address_1();
+
+        if ( ! class_exists( '\setasign\Fpdi\Tcpdf\Fpdi' ) && ! class_exists( '\setasign\Fpdi\Fpdi' ) ) {
+            return new WP_Error( 'missing_lib', 'FPDI/TCPDF knihovny nejsou dostupné. Nainstalujte závislosti (composer require setasign/fpdi-tcpdf) nebo přidejte knihovny do pluginu.' );
         }
-        if ( empty($address2) ) {
-            // TADY: konkrétně bereme shipping_address_2 z objednávky (pole, které jsi chtěl)
-            $address2 = $order_candidate->get_shipping_address_2() ?: $order_candidate->get_meta('shipping_address_2');
-        }
-        if ( empty($city) ) {
-            $city = $order_candidate->get_shipping_city() ?: $order_candidate->get_billing_city();
-        }
-        if ( empty($zip) ) {
-            $zip = $order_candidate->get_shipping_postcode() ?: $order_candidate->get_billing_postcode();
-        }
-        if ( empty($branch_id) ) {
-            $branch_id = $order_candidate->get_meta('_wc_balikovna_branch_id');
-        }
-        if ( empty($branch_name) ) {
-            $branch_name = $order_candidate->get_meta('_wc_balikovna_branch_name');
+
+        try {
+            $template_path = WC_BALIKOVNA_PLUGIN_DIR . 'assets/BAL_stitek_HD_balikovna.pdf';
+            if ( ! file_exists( $template_path ) ) {
+                return new WP_Error( 'template_missing', 'Šablona PDF nebyla nalezena: assets/template.pdf' );
+            }
+
+            // Instantiate appropriate FPDI class
+            if ( class_exists( '\setasign\Fpdi\Tcpdf\Fpdi' ) ) {
+                $pdf = new \setasign\Fpdi\Tcpdf\Fpdi();
+            } elseif ( class_exists( '\setasign\Fpdi\Fpdi' ) ) {
+                $pdf = new \setasign\Fpdi\Fpdi();
+            } else {
+                return new WP_Error( 'no_pdf_engine', 'Nevhodná PDF knihovna' );
+            }
+
+            // Metadata (pokud dostupné)
+            if ( method_exists( $pdf, 'SetCreator' ) ) {
+                $pdf->SetCreator( 'WooCommerce Balíkovna' );
+                $pdf->SetAuthor( get_bloginfo( 'name' ) );
+                $pdf->SetTitle( 'Balíkovna - Adresní štítek' );
+            }
+            if ( method_exists( $pdf, 'SetPrintHeader' ) ) {
+                $pdf->SetPrintHeader( false );
+                $pdf->SetPrintFooter( false );
+            }
+
+            // Načteme template a vykreslíme
+            $pageCount = $pdf->setSourceFile( $template_path );
+            $tplId = $pdf->importPage( 1 );
+
+            $pdf->AddPage();
+            $pdf->useTemplate( $tplId, 0, 0 );
+
+            // Font (TCPDF podporuje UTF-8)
+            if ( method_exists( $pdf, 'SetFont' ) ) {
+                $pdf->SetFont( 'dejavusans', '', 10 );
+            }
+
+            $maxWidth = 85; // uprav dle šablony
+
+            // --- Vykreslení polí (souřadnice uprav podle vaší šablony) ---
+           // --- START: Výpis odesílatele — 4 řádky, co největším písmem do šířky $maxWidth ---
+            $senderX = 12; // uprav X pozici podle potřeby (mm)
+            $senderY = 17; // uprav Y pozici podle potřeby (mm)
+
+            // První řádek: Obj. č. {číslo} z SU~PR sušené | pražené
+            $order_number_display = '';
+            if ( isset( $data['sender']['order_number'] ) && ! empty( $data['sender']['order_number'] ) ) {
+                $order_number_display = $data['sender']['order_number'];
+            } elseif ( isset( $order ) && is_object( $order ) ) {
+                $order_number_display = $order->get_id();
+            }
+
+            $sender_lines = array(
+                'Obj. č. ' . $order_number_display . ' z SU~PR sušené | pražené',
+                'Petrašovice 61',
+                'Bílá - Petrašovice',
+                '463 42',
+            );
+
+            // Font a počáteční velikost (mm jednotky používá TCPDF v bodech fontSize)
+            $font_family = 'dejavusans';
+            $font_style = '';
+            $fontSize = 10; // počáteční velikost — bude snižována pokud se nevejde
+            $minFontSize = 3; // minimální velikost které dovolíme
+            $lineGap = 1; // mezera mezi řádky v mm (násobek fontSize použijeme níže)
+
+            // Zajistíme, že GetStringWidth použije stejný font a velikost při měření
+            // Pokud GetStringWidth nepodporuje čtvrtý parametr v tvé sestavě TCPDF, použij jen $pdf->GetStringWidth($text) a uprav logiku.
+            $fits = false;
+            while ( $fontSize >= $minFontSize ) {
+                $tooWide = false;
+                foreach ( $sender_lines as $line ) {
+                    // GetStringWidth(text, font, style, fontsize) - vrací šířku v aktuálních jednotkách (mm)
+                    $w = $pdf->GetStringWidth( $line, $font_family, $font_style, $fontSize );
+                    if ( $w > $maxWidth ) {
+                        $tooWide = true;
+                        break;
+                    }
+                }
+                if ( ! $tooWide ) {
+                    $fits = true;
+                    break;
+                }
+                $fontSize -= 1; // snižujeme o 1 pt dokud se to nevejde
+            }
+
+            // Pokud se nic nevejde i při minFontSize, ořízneme text (truncation) nebo zmenšíme ještě víc
+            if ( ! $fits ) {
+                // fallback: použij minFontSize a případně zkrátit první řádek pokud je potřeba
+                $fontSize = $minFontSize;
+                // volitelně: můžeme zkrátit první řádek, aby se vešel
+                $first = $sender_lines[0];
+                while ( $pdf->GetStringWidth( $first, $font_family, $font_style, $fontSize ) > $maxWidth && mb_strlen($first) > 3 ) {
+                    $first = mb_substr( $first, 0, mb_strlen($first) - 1 );
+                }
+                if ( mb_strlen($first) < mb_strlen($sender_lines[0]) ) {
+                    $first = rtrim( $first ) . '…';
+                    $sender_lines[0] = $first;
+                }
+            }
+
+            // Nastavíme font a vykreslíme řádky
+            $pdf->SetFont( $font_family, $font_style, $fontSize );
+            $pdf->SetTextColor( 0, 0, 0 );
+
+            // spočítáme výšku jednoho řádku (přibližně)
+            // TCPDF používá font size v bodech; přepočet na mm pro řádkování: použijeme jednoduchý faktor
+            $lineHeight = max(  ( $fontSize * 0.35 ), 4 ); // 0.35 ~ převod na mm přijatelný, 4mm min výška řádku
+
+            $curY = $senderY;
+            foreach ( $sender_lines as $line ) {
+                $pdf->SetXY( $senderX, $curY );
+                // Použijeme Cell přesně do šířky $maxWidth a zarovnání vlevo
+                $pdf->Cell( $maxWidth, $lineHeight, $line, 0, 1, 'L', 0, '', 0 );
+                $curY += $lineHeight + $lineGap;
+            }
+
+            // Posuň kurzor pod tuto sekci, aby další obsah nezačínal přes odesílatele
+            $pdf->SetY( $curY + 1 ); // 1 mm mezera navíc
+            // --- END: Výpis odesílatele ---
+
+            // --- START: Sekce "Adresát" (1: jméno TUČNĚ; 2: shipping_address_2 nebo branch; 3: ulice+č.p.; 4: PSČ + město TUČNĚ) ---
+            $recipientX = 12;
+            $recipientY = 45; // původní pozice
+
+            // Primární zdroj dat z $data
+            $recipient_name = !empty($data['recipient']['name']) ? wp_strip_all_tags($data['recipient']['name']) : '';
+            $address1 = !empty($data['recipient']['street']) ? wp_strip_all_tags($data['recipient']['street']) : '';
+            $address2 = !empty($data['recipient']['address_2']) ? wp_strip_all_tags($data['recipient']['address_2']) : '';
+            $city = !empty($data['recipient']['city']) ? wp_strip_all_tags($data['recipient']['city']) : '';
+            $zip  = !empty($data['recipient']['zipCode']) ? wp_strip_all_tags($data['recipient']['zipCode']) : '';
+
+            // Fallbacky: pokud chybí některé údaje, zkusíme objednávku podle sender.order_number
+            $branch_id = !empty($data['recipient']['branch_id']) ? wp_strip_all_tags($data['recipient']['branch_id']) : '';
+            $branch_name = !empty($data['recipient']['branch_name']) ? wp_strip_all_tags($data['recipient']['branch_name']) : '';
+
+            if ( empty($address2) || empty($address1) || empty($city) || empty($zip) || empty($recipient_name) || ( empty($branch_id) && empty($branch_name) ) ) {
+                $order_candidate = null;
+                if ( ! empty( $data['sender']['order_number'] ) ) {
+                    $on = $data['sender']['order_number'];
+                    if ( is_numeric( $on ) ) {
+                        $order_candidate = wc_get_order( intval( $on ) );
+                    } else {
+                        // někdy prepare_label_data může vrátit order_number jako text — zkus nejdřív ID, pak order number
+                        $order_candidate = wc_get_order( intval( $on ) );
+                    }
+                }
+                if ( $order_candidate ) {
+                    if ( empty($recipient_name) ) {
+                        $recipient_name = trim( $order_candidate->get_shipping_first_name() . ' ' . $order_candidate->get_shipping_last_name() );
+                        if ( empty($recipient_name) ) {
+                            $recipient_name = trim( $order_candidate->get_billing_first_name() . ' ' . $order_candidate->get_billing_last_name() );
+                        }
+                    }
+                    if ( empty($address1) ) {
+                        $address1 = $order_candidate->get_shipping_address_1() ?: $order_candidate->get_billing_address_1();
+                    }
+                    if ( empty($address2) ) {
+                        // TADY: konkrétně bereme shipping_address_2 z objednávky (pole, které jsi chtěl)
+                        $address2 = $order_candidate->get_shipping_address_2() ?: $order_candidate->get_meta('shipping_address_2');
+                    }
+                    if ( empty($city) ) {
+                        $city = $order_candidate->get_shipping_city() ?: $order_candidate->get_billing_city();
+                    }
+                    if ( empty($zip) ) {
+                        $zip = $order_candidate->get_shipping_postcode() ?: $order_candidate->get_billing_postcode();
+                    }
+                    if ( empty($branch_id) ) {
+                        $branch_id = $order_candidate->get_meta('_wc_balikovna_branch_id');
+                    }
+                    if ( empty($branch_name) ) {
+                        $branch_name = $order_candidate->get_meta('_wc_balikovna_branch_name');
+                    }
+                }
+            }
+
+            // Druhý řádek: preferuj address2 (shipping_address_2), pokud prázdné, použij branch_name nebo "Balíkovna"
+            $line1 = $recipient_name;
+            $line2 = '';
+            if ( ! empty( $address2 ) ) {
+                $line2 = $address2;
+            } else {
+                if ( ! empty( $branch_name ) ) {
+                    $line2 = $branch_name;
+                } elseif ( ! empty( $branch_id ) ) {
+                    $line2 = 'Balíkovna ID: ' . $branch_id;
+                } else {
+                    // pokud opravdu nic není, nechte prázdné (nebude vykresleno)
+                    $line2 = '';
+                }
+            }
+            $line3 = $address1;
+            $line4 = trim( $zip . ' ' . $city );
+
+            // Vytvoříme pole řádků (max 4), přeskočíme prázdné
+            $recipient_lines = array();
+            if ( $line1 !== '' ) $recipient_lines[] = $line1;
+            if ( $line2 !== '' ) $recipient_lines[] = $line2;
+            if ( $line3 !== '' ) $recipient_lines[] = $line3;
+            if ( $line4 !== '' ) $recipient_lines[] = $line4;
+
+            // Fonty / velikosti
+            $font_family = 'dejavusans';
+            $fontSizeBold = 12;
+            $fontSizeNormal = 11;
+            $minFontSize = 7;
+
+            // Helper pro vykreslení jedné linky, vrací použité lineHeight v mm
+            $drawLine = function( $text, $x, $y, $width, $fontFamily, $fontStyle, $fontSize ) use ( $pdf, $minFontSize ) {
+                $fs = $fontSize;
+                while ( $fs >= $minFontSize ) {
+                    $w = $pdf->GetStringWidth( $text, $fontFamily, $fontStyle, $fs );
+                    if ( $w <= $width ) break;
+                    $fs -= 1;
+                }
+                if ( $fs < $minFontSize ) $fs = $minFontSize;
+                $pdf->SetFont( $fontFamily, $fontStyle, $fs );
+                $pdf->SetXY( $x, $y );
+                $pdf->Cell( $width, 0, $text, 0, 1, 'L', 0, '', 0 );
+                return max( ( $fs * 0.35 ), 4 );
+            };
+
+            // Vykreslíme řádky s požadovanými styly (1. tučně; 2. normálně; 3. normálně; 4. tučně)
+            $curY = $recipientY;
+            $totalLines = count( $recipient_lines );
+            foreach ( $recipient_lines as $idx => $line ) {
+                // 1. řádek je vždy první (idx==0) -> bold
+                if ( $idx === 0 ) {
+                    $lineHeight = $drawLine( $line, $recipientX, $curY, $maxWidth, $font_family, 'B', $fontSizeBold );
+                } elseif ( $idx === 3 ) {
+                    // pokud máme skutečně 4 řádky, 4. má být tučný (PSČ + město)
+                    $lineHeight = $drawLine( $line, $recipientX, $curY, $maxWidth, $font_family, 'B', $fontSizeBold );
+                } else {
+                    // ostatní řádky normální
+                    $lineHeight = $drawLine( $line, $recipientX, $curY, $maxWidth, $font_family, '', $fontSizeNormal );
+                }
+                $curY += $lineHeight + 1; // 1 mm gap
+            }
+
+            // Nastavíme kurzor pod adresátem
+            $pdf->SetY( $curY + 1 );
+            // --- END: Sekce "Adresát" ---
+
+            // Vložíme piktogram a do něj vykreslíme hmotnost (formát x,yy bez jednotky)
+            $img_path = WC_BALIKOVNA_PLUGIN_DIR . 'assets/18_hmotnost_hodnota_20_10.jpg';
+            $x = 80;
+            $y = $pdf->GetY() + 5;
+            $img_w = 20; // šířka v mm (uprav dle potřeby)
+            $img_h = 10; // výška v mm (uprav dle potřeby)
+
+            // Robustní formátování hmotnosti pro zobrazení (obr. piktogram)
+            // $data['weight'] může být v kg nebo (chybně) v g — provádíme detekci a zobrazíme podle nastavení obchodu.
+
+            $weight_display = '';
+            if ( isset( $data['weight'] ) && $data['weight'] !== '' ) {
+
+                // normalizace vstupu na číslo (float) — nahradíme čárku tečkou pro floatval
+                $raw = (string) $data['weight'];
+                $raw_normalized = str_replace( ',', '.', $raw );
+                $raw_float = floatval( $raw_normalized );
+
+                // zjištění jednotky v nastavení WooCommerce
+                $store_unit = strtolower( trim( get_option( 'woocommerce_weight_unit', 'kg' ) ) ); // 'kg' nebo 'g' apod.
+
+                // Heuristika: zjistíme, zda vstup vypadá jako "kg" (tzn. má desetinnou část nebo je velmi malé <10)
+                // nebo jako "g" (celé číslo typicky >=1)
+                $looks_like_fractional = ( abs( $raw_float - floor( $raw_float ) ) > 0.000001 ); // má desetinnou část
+                $looks_large_number = ( $raw_float > 1000 ); // např. 150000 -> určitě g
+
+                // Normalizovat vstup na kg pro vnitřní logiku:
+                // - pokud vstup vypadá jako velmi velké číslo (>1000) => předpokládejme gramy a převeď na kg
+                // - pokud obchod má unit 'g' a vstup je celé číslo (bez desetinné části) => pravděpodobně je to gramy -> převeď na kg
+                // - pokud vstup má desetinnou část -> pravděpodobně jde o kg (např. 0.15)
+                if ( $looks_large_number ) {
+                    // určitě g
+                    $weight_kg = $raw_float / 1000.0;
+                } elseif ( $store_unit === 'g' && ! $looks_like_fractional ) {
+                    // obchod v gramech a vstup je celé číslo => pravděpodobně grams value
+                    $weight_kg = $raw_float / 1000.0;
+                } elseif ( $looks_like_fractional && $raw_float < 10 ) {
+                    // má desetinnou část a není obří => pravděpodobně kg (např. 0.15)
+                    $weight_kg = $raw_float;
+                } else {
+                    // fallback: pokud hodnota menší než 5 a má desetinnou část => kg,
+                    // jinak pokud je menší než 5 a bez desetinné části může to být g nebo kg -> použij heuristiku podle store_unit
+                    if ( $store_unit === 'g' && $raw_float >= 1 ) {
+                        // preferuj gramy pokud obchod používá gramy
+                        $weight_kg = $raw_float / 1000.0;
+                    } else {
+                        $weight_kg = $raw_float;
+                    }
+                }
+
+                // Teď máme $weight_kg jako float (kg). Rozhodneme, jak zobrazit:
+                // The user asked to display in kg — we'll display in kg with 2 decimals.
+                $weight_display = number_format( max(0, (float) $weight_kg), 2, ',', '' );
+
+                // Volitelně debug:
+                // error_log( 'WC Balíkovna DEBUG: raw=' . $raw . ' raw_float=' . $raw_float . ' weight_kg=' . $weight_kg . ' display=' . $weight_display . ' store_unit=' . $store_unit );
+
+            } else {
+                $weight_display = '';
+            }
+
+            if ( file_exists( $img_path ) ) {
+                // Vložíme obrázek
+                $pdf->Image( $img_path, $x, $y, $img_w, $img_h, 'JPG' );
+
+                // Font pro text uvnitř obrázku
+                if ( method_exists( $pdf, 'SetFont' ) ) {
+                    $pdf->SetFont( 'dejavusans', '', 9 ); // normal font (user asked non-bold)
+                } else {
+                    $pdf->SetFont( 'Helvetica', '', 9 ); // fallback
+                }
+                $pdf->SetTextColor(0, 0, 0);
+
+                // Připravíme text (bez jednotky)
+                $text = $weight_display;
+
+                // Zjistíme šířku textu (metoda vrací šířku v aktuálních jednotkách)
+                $textWidth = $pdf->GetStringWidth( $text );
+
+                // Vypočítáme pozici pro centrovaný text uvnitř obrázku
+                $textX = $x + max(0, ($img_w - $textWidth) / 2);
+                $textY = $y + ($img_h / 2) - 2; // ladicí posun; uprav podle potřeby
+
+                // --- POSUN TEXTU DOPRAVA: uprav hodnotu $offset_right_mm (v mm) ---
+                $offset_right_mm = 3; // <--- změň na 0/1/2/... podle potřeby
+                $textX += $offset_right_mm;
+
+                // Vykreslíme text pomocí přesné X pozice (zarovnáno vlevo, protože jsme spočítali přesný X)
+                $pdf->SetXY( $textX, $textY );
+                $pdf->Cell( $textWidth, 0, $text, 0, 1, 'L', 0, '', 0 );
+
+                // Po vykreslení obrázku zajistíme, že další obsah nezačne přes něj
+                $pdf->SetY( $y + $img_h + 1 ); // 1 mm mezera pod obrázkem, uprav dle potřeby
+
+            } else {
+                // Fallback: pokud obrázek chybí, vypíšeme jen číslo bez jednotky
+                $pdf->SetXY( 75, $pdf->GetY() + 10 );
+                $pdf->SetFont( 'dejavusans', '', 10 );
+                $pdf->MultiCell( $maxWidth, 5, $weight_display, 0, 'L' );
+                error_log( 'WC Balíkovna DEBUG: weight icon not found: ' . $img_path );
+            }
+
+            // Uložit do uploads
+            $upload_dir = wp_upload_dir();
+            $dir = trailingslashit( $upload_dir['basedir'] ) . 'wc-balikovna-labels';
+            if ( ! file_exists( $dir ) ) {
+                wp_mkdir_p( $dir );
+            }
+            $filename = 'balikovna_label_' . sanitize_file_name( (string) $data['sender']['order_number'] ) . '_' . time() . '.pdf';
+            $filepath = trailingslashit( $dir ) . $filename;
+
+            $pdf->Output( $filepath, 'F' );
+
+            $url = trailingslashit( $upload_dir['baseurl'] ) . 'wc-balikovna-labels/' . $filename;
+            return array( 'success' => true, 'url' => $url );
+
+        } catch ( Exception $e ) {
+            return new WP_Error( 'pdf_error', 'Chyba při generování PDF: ' . $e->getMessage() );
         }
     }
-}
-
-// Druhý řádek: preferuj address2 (shipping_address_2), pokud prázdné, použij branch_name nebo "Balíkovna"
-$line1 = $recipient_name;
-$line2 = '';
-if ( ! empty( $address2 ) ) {
-    $line2 = $address2;
-} else {
-    if ( ! empty( $branch_name ) ) {
-        $line2 = $branch_name;
-    } elseif ( ! empty( $branch_id ) ) {
-        $line2 = 'Balíkovna ID: ' . $branch_id;
-    } else {
-        // pokud opravdu nic není, nechte prázdné (nebude vykresleno)
-        $line2 = '';
-    }
-}
-$line3 = $address1;
-$line4 = trim( $zip . ' ' . $city );
-
-// Vytvoříme pole řádků (max 4), přeskočíme prázdné
-$recipient_lines = array();
-if ( $line1 !== '' ) $recipient_lines[] = $line1;
-if ( $line2 !== '' ) $recipient_lines[] = $line2;
-if ( $line3 !== '' ) $recipient_lines[] = $line3;
-if ( $line4 !== '' ) $recipient_lines[] = $line4;
-
-// Fonty / velikosti
-$font_family = 'dejavusans';
-$fontSizeBold = 12;
-$fontSizeNormal = 11;
-$minFontSize = 7;
-
-// Helper pro vykreslení jedné linky, vrací použité lineHeight v mm
-$drawLine = function( $text, $x, $y, $width, $fontFamily, $fontStyle, $fontSize ) use ( $pdf, $minFontSize ) {
-    $fs = $fontSize;
-    while ( $fs >= $minFontSize ) {
-        $w = $pdf->GetStringWidth( $text, $fontFamily, $fontStyle, $fs );
-        if ( $w <= $width ) break;
-        $fs -= 1;
-    }
-    if ( $fs < $minFontSize ) $fs = $minFontSize;
-    $pdf->SetFont( $fontFamily, $fontStyle, $fs );
-    $pdf->SetXY( $x, $y );
-    $pdf->Cell( $width, 0, $text, 0, 1, 'L', 0, '', 0 );
-    return max( ( $fs * 0.35 ), 4 );
-};
-
-// Vykreslíme řádky s požadovanými styly (1. tučně; 2. normálně; 3. normálně; 4. tučně)
-$curY = $recipientY;
-$totalLines = count( $recipient_lines );
-foreach ( $recipient_lines as $idx => $line ) {
-    // 1. řádek je vždy první (idx==0) -> bold
-    if ( $idx === 0 ) {
-        $lineHeight = $drawLine( $line, $recipientX, $curY, $maxWidth, $font_family, 'B', $fontSizeBold );
-    } elseif ( $idx === 3 ) {
-        // pokud máme skutečně 4 řádky, 4. má být tučný (PSČ + město)
-        $lineHeight = $drawLine( $line, $recipientX, $curY, $maxWidth, $font_family, 'B', $fontSizeBold );
-    } else {
-        // ostatní řádky normální
-        $lineHeight = $drawLine( $line, $recipientX, $curY, $maxWidth, $font_family, '', $fontSizeNormal );
-    }
-    $curY += $lineHeight + 1; // 1 mm gap
-}
-
-// Nastavíme kurzor pod adresátem
-$pdf->SetY( $curY + 1 );
-// --- END: Sekce "Adresát" ---
-
-// Vložíme piktogram a do něj vykreslíme hmotnost (formát x,yy bez jednotky)
-$img_path = WC_BALIKOVNA_PLUGIN_DIR . 'assets/18_hmotnost_hodnota_20_10.jpg';
-$x = 80;
-$y = $pdf->GetY() + 5;
-$img_w = 20; // šířka v mm (uprav dle potřeby)
-$img_h = 10; // výška v mm (uprav dle potřeby)
-
-// Robustní formátování hmotnosti pro zobrazení (obr. piktogram)
-// $data['weight'] může být v kg nebo (chybn\ě) v g — provádíme detekci a zobrazíme podle nastavení obchodu.
-
-$weight_display = '';
-if ( isset( $data['weight'] ) && $data['weight'] !== '' ) {
-
-    // normalizace vstupu na číslo (float) — nahradíme čárku tečkou pro floatval
-    $raw = (string) $data['weight'];
-    $raw_normalized = str_replace( ',', '.', $raw );
-    $raw_float = floatval( $raw_normalized );
-
-    // zjištění jednotky v nastavení WooCommerce
-    $store_unit = strtolower( trim( get_option( 'woocommerce_weight_unit', 'kg' ) ) ); // 'kg' nebo 'g' apod.
-
-    // Heuristika: zjistíme, zda vstup vypadá jako "kg" (tzn. má desetinnou část nebo je velmi malé <10)
-    // nebo jako "g" (celé číslo typicky >=1)
-    $looks_like_fractional = ( abs( $raw_float - floor( $raw_float ) ) > 0.000001 ); // má desetinnou část
-    $looks_large_number = ( $raw_float > 1000 ); // např. 150000 -> určitě g
-
-    // Normalizovat vstup na kg pro vnitřní logiku:
-    // - pokud vstup vypadá jako velmi velké číslo (>1000) => předpokládejme gramy a převeď na kg
-    // - pokud obchod má unit 'g' a vstup je celé číslo (bez desetinné části) => pravděpodobně je to gramy -> převeď na kg
-    // - pokud vstup má desetinnou část -> pravděpodobně jde o kg (např. 0.15)
-    if ( $looks_large_number ) {
-        // určitě g
-        $weight_kg = $raw_float / 1000.0;
-    } elseif ( $store_unit === 'g' && ! $looks_like_fractional ) {
-        // obchod v gramech a vstup je celé číslo => pravděpodobně grams value
-        $weight_kg = $raw_float / 1000.0;
-    } elseif ( $looks_like_fractional && $raw_float < 10 ) {
-        // má desetinnou část a není obří => pravděpodobně kg (např. 0.15)
-        $weight_kg = $raw_float;
-    } else {
-        // fallback: pokud hodnota menší než 5 a má desetinnou část => kg,
-        // jinak pokud je menší než 5 a bez desetinné části může to být g nebo kg -> použij heuristiku podle store_unit
-        if ( $store_unit === 'g' && $raw_float >= 1 ) {
-            // preferuj gramy pokud obchod používá gramy
-            $weight_kg = $raw_float / 1000.0;
-        } else {
-            $weight_kg = $raw_float;
-        }
-    }
-
-    // Teď máme $weight_kg jako float (kg). Rozhodneme, jak zobrazit:
-    if ( $store_unit === 'g' ) {
-        // obchod preferuje gramy -> zobraz v g (celé číslo)
-        $weight_g = round( $weight_kg * 1000 );
-        $weight_display = number_format( $weight_g, 0, ',', '' );
-    } elseif ( $store_unit === 'kg' ) {
-        // obchod preferuje kg -> zobraz s 2 des. místy
-        $weight_display = number_format( $weight_kg, 2, ',', '' );
-    } else {
-        // fallback heuristika: pokud <1 kg -> g else kg
-        if ( $weight_kg < 1.0 ) {
-            $weight_g = round( $weight_kg * 1000 );
-            $weight_display = number_format( $weight_g, 0, ',', '' );
-        } else {
-            $weight_display = number_format( $weight_kg, 2, ',', '' );
-        }
-    }
-
-    // volitelně debug (odkomentuj pro logování)
-    // error_log('WC Balíkovna DEBUG: raw=' . $raw . ' raw_float=' . $raw_float . ' normalized_kg=' . $weight_kg . ' display=' . $weight_display . ' store_unit=' . $store_unit);
-} else {
-    $weight_display = '';
-}
-
-if ( file_exists( $img_path ) ) {
-    // Vložíme obrázek
-    $pdf->Image( $img_path, $x, $y, $img_w, $img_h, 'JPG' );
-
-    // Font pro text uvnitř obrázku
-    if ( method_exists( $pdf, 'SetFont' ) ) {
-        $pdf->SetFont( 'dejavusans', 'B', 9 );
-    } else {
-        $pdf->SetFont( 'Helvetica', 'B', 9 ); // fallback
-    }
-    $pdf->SetTextColor(0, 0, 0);
-
-    // Připravíme text (bez jednotky)
-    $text = $weight_display;
-
-    // Zjistíme šířku textu (metoda vrací šířku v aktuálních jednotkách)
-    $textWidth = $pdf->GetStringWidth( $text );
-
-    // Vypočítáme pozici pro centrovaný text uvnitř obrázku
-    $textX = $x + max(0, ($img_w - $textWidth) / 2);
-    $textY = $y + ($img_h / 2) - 2; // ladicí posun; uprav podle potřeby
-
-    // --- POSUN TEXTU DOPRAVA: uprav hodnotu $offset_right_mm (v mm) ---
-    $offset_right_mm = 3; // <--- změň na 0/1/2/... podle potřeby
-    $textX += $offset_right_mm;
-
-    // Vykreslíme text pomocí přesné X pozice (zarovnáno vlevo, protože jsme spočítali přesný X)
-    $pdf->SetXY( $textX, $textY );
-    $pdf->Cell( $textWidth, 0, $text, 0, 1, 'L', 0, '', 0 );
-
-    // Po vykreslení obrázku zajistíme, že další obsah nezačne přes něj
-    $pdf->SetY( $y + $img_h + 1 ); // 1 mm mezera pod obrázkem, uprav dle potřeby
-
-} else {
-    // Fallback: pokud obrázek chybí, vypíšeme jen číslo bez jednotky
-    $pdf->SetXY( 75, $pdf->GetY() + 10 );
-    $pdf->SetFont( 'dejavusans', '', 10 );
-    $pdf->MultiCell( $maxWidth, 5, $weight_display, 0, 'L' );
-    error_log( 'WC Balíkovna DEBUG: weight icon not found: ' . $img_path );
-}
-
-        // Uložit do uploads
-        $upload_dir = wp_upload_dir();
-        $dir = trailingslashit( $upload_dir['basedir'] ) . 'wc-balikovna-labels';
-        if ( ! file_exists( $dir ) ) {
-            wp_mkdir_p( $dir );
-        }
-        $filename = 'balikovna_label_' . sanitize_file_name( (string) $data['sender']['order_number'] ) . '_' . time() . '.pdf';
-        $filepath = trailingslashit( $dir ) . $filename;
-
-        $pdf->Output( $filepath, 'F' );
-
-        $url = trailingslashit( $upload_dir['baseurl'] ) . 'wc-balikovna-labels/' . $filename;
-        return array( 'success' => true, 'url' => $url );
-
-    } catch ( Exception $e ) {
-        return new WP_Error( 'pdf_error', 'Chyba při generování PDF: ' . $e->getMessage() );
-    }
-}
 
     /**
      * Call API endpoint
@@ -1026,95 +1002,6 @@ if ( file_exists( $img_path ) ) {
             'label_url' => $mock_label_url,
             'message' => __('Štítek byl úspěšně vygenerován (MOCK - implementace skutečného API volání čeká na dokumentaci API České pošty)', 'wc-balikovna-komplet')
         );
-
-        /*
-        // Real API implementation would look like this:
-        $url = $this->api_url . $endpoint;
-        
-        $request_body = json_encode($data);
-        
-        error_log('WC Balíkovna API: Request URL: ' . $url);
-        error_log('WC Balíkovna API: Request body: ' . $request_body);
-        
-        $response = wp_remote_post($url, array(
-            'headers' => array(
-                'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . $api_token,
-            ),
-            'body' => $request_body,
-            'timeout' => 30
-        ));
-
-        if (is_wp_error($response)) {
-            $error_message = $response->get_error_message();
-            error_log('WC Balíkovna API ERROR: wp_remote_post failed: ' . $error_message);
-            return array(
-                'success' => false,
-                'message' => sprintf(
-                    __('Chyba při komunikaci s API: %s', 'wc-balikovna-komplet'),
-                    $error_message
-                )
-            );
-        }
-
-        $http_code = wp_remote_retrieve_response_code($response);
-        $body = wp_remote_retrieve_body($response);
-        
-        error_log('WC Balíkovna API: Response HTTP code: ' . $http_code);
-        error_log('WC Balíkovna API: Response body: ' . $body);
-
-        if ($http_code !== 200 && $http_code !== 201) {
-            error_log('WC Balíkovna API ERROR: Non-success HTTP code: ' . $http_code);
-            return array(
-                'success' => false,
-                'message' => sprintf(
-                    __('API vrátilo chybu HTTP %d. Odpověď: %s', 'wc-balikovna-komplet'),
-                    $http_code,
-                    substr($body, 0, 200)
-                )
-            );
-        }
-        
-        $result = json_decode($body, true);
-        
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            error_log('WC Balíkovna API ERROR: Failed to parse JSON response: ' . json_last_error_msg());
-            return array(
-                'success' => false,
-                'message' => sprintf(
-                    __('Chyba při parsování odpovědi API: %s', 'wc-balikovna-komplet'),
-                    json_last_error_msg()
-                )
-            );
-        }
-
-        if (isset($result['error'])) {
-            error_log('WC Balíkovna API ERROR: API returned error: ' . $result['error']);
-            return array(
-                'success' => false,
-                'message' => sprintf(
-                    __('API chyba: %s', 'wc-balikovna-komplet'),
-                    $result['error']
-                )
-            );
-        }
-        
-        if (!isset($result['label_url'])) {
-            error_log('WC Balíkovna API ERROR: Missing label_url in API response');
-            return array(
-                'success' => false,
-                'message' => __('API nevrátilo URL štítku', 'wc-balikovna-komplet')
-            );
-        }
-
-        error_log('WC Balíkovna API: Success - label URL: ' . $result['label_url']);
-        
-        return array(
-            'success' => true,
-            'label_url' => $result['label_url'],
-            'message' => __('Štítek byl úspěšně vygenerován', 'wc-balikovna-komplet')
-        );
-        */
     }
 
     /**
@@ -1155,27 +1042,62 @@ if ( file_exists( $img_path ) ) {
     }
 
     /**
-     * Calculate order weight
+     * Calculate order weight and return it in kilograms (float)
      *
      * @param WC_Order $order
-     * @return float
+     * @return float Weight in kilograms
      */
     private function calculate_order_weight($order)
     {
-        $weight = 0;
+        // Get store weight unit (kg, g, lbs, oz)
+        $unit = get_option('woocommerce_weight_unit', 'kg');
 
+        $total = 0.0;
         foreach ($order->get_items() as $item) {
             $product = $item->get_product();
-            if ($product && $product->get_weight()) {
-                $weight += floatval($product->get_weight()) * $item->get_quantity();
+            $qty     = $item->get_quantity();
+            if ($product) {
+                $prod_weight = $product->get_weight();
+                $prod_weight = $prod_weight ? floatval($prod_weight) : 0.0;
+                $total += $prod_weight * $qty;
             }
         }
 
-        // Default weight if no weight is set (in kg)
-        if ($weight === 0) {
-            $weight = 1.0;
+        // Default weight if none set
+        if ($total <= 0) {
+            $total = 1.0;
         }
 
-        return $weight;
+        // Convert total to kilograms depending on store unit
+        switch ( strtolower( $unit ) ) {
+            case 'g':
+            case 'gram':
+            case 'grams':
+                $weight_kg = $total / 1000.0;
+                break;
+            case 'kg':
+            case 'kilogram':
+            case 'kilograms':
+                $weight_kg = $total;
+                break;
+            case 'lbs':
+            case 'lb':
+            case 'pound':
+            case 'pounds':
+                $weight_kg = $total * 0.45359237;
+                break;
+            case 'oz':
+            case 'ounce':
+            case 'ounces':
+                $weight_kg = $total * 0.0283495231;
+                break;
+            default:
+                // unknown unit — assume already kg
+                $weight_kg = $total;
+                break;
+        }
+
+        // ensure reasonable precision
+        return round( (float) $weight_kg, 6 );
     }
 }
