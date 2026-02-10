@@ -869,8 +869,38 @@ $y = $pdf->GetY() + 5;
 $img_w = 20; // šířka v mm (uprav dle potřeby)
 $img_h = 10; // výška v mm (uprav dle potřeby)
 
-// Formát hmotnosti pro zobrazení: 2 desetinná místa + čárka jako oddělovač
-$weight_display = is_numeric( $data['weight'] ) ? number_format( (float) $data['weight'], 2, ',', '' ) : $data['weight'];
+// Formát hmotnosti pro zobrazení: inteligentně podle nastavení WC nebo podle velikosti zásilky
+// $data['weight'] by měl být v kilogramech (float)
+$weight_display = '';
+if ( isset( $data['weight'] ) && is_numeric( $data['weight'] ) ) {
+    $weight_kg = (float) $data['weight'];
+
+    // zjištění jednotky v nastavení WooCommerce
+    $store_unit = get_option( 'woocommerce_weight_unit', 'kg' ); // 'kg' nebo 'g' nejčastěji
+
+    // Normalizace zkratek
+    $unit = strtolower( trim( $store_unit ) );
+
+    if ( $unit === 'g' || $unit === 'gram' || $unit === 'grams' ) {
+        // obchod má nastaveno gramy -> zobrazit gramy (celé číslo)
+        $weight_g = round( $weight_kg * 1000 );
+        $weight_display = number_format( $weight_g, 0, ',', '' );
+    } elseif ( $unit === 'kg' || $unit === 'kilogram' || $unit === 'kilograms' ) {
+        // obchod má nastaveno kg -> zobrazit kg s 2 desetinnými místy
+        $weight_display = number_format( $weight_kg, 2, ',', '' );
+    } else {
+        // fallback: heuristika podle velikosti
+        if ( $weight_kg < 1.0 ) {
+            $weight_g = round( $weight_kg * 1000 );
+            $weight_display = number_format( $weight_g, 0, ',', '' );
+        } else {
+            $weight_display = number_format( $weight_kg, 2, ',', '' );
+        }
+    }
+} else {
+    // neznámá/nesprávná váha -> fallback text/původní hodnota
+    $weight_display = isset( $data['weight'] ) ? (string) $data['weight'] : '';
+}
 
 if ( file_exists( $img_path ) ) {
     // Vložíme obrázek
