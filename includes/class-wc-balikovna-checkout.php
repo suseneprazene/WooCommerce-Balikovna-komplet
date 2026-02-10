@@ -178,6 +178,32 @@ jQuery(function($) {
                 
                 // Save to hidden field as JSON
                 $('#wc_balikovna_branch').val(JSON.stringify(branchData));
+				// --- START: zavolat globální wrapper (wcBalikovnaApplyBranch), který je bezpečný i když hlavní JS ještě nebyl inicializován ---
+try {
+    if (typeof window.wcBalikovnaApplyBranch === 'function') {
+        window.wcBalikovnaApplyBranch(branchData);
+    } else if (typeof window.WCBalikovnaCheckout !== 'undefined' && typeof window.WCBalikovnaCheckout.applyBranchToFields === 'function') {
+        // fallback
+        window.WCBalikovnaCheckout.applyBranchToFields(branchData);
+    } else {
+        console.log('WC Balíkovna DEBUG: applyBranchToFields not available yet, branch saved to hidden field');
+    }
+} catch (e) {
+    console.error('WC Balíkovna DEBUG: iframe apply wrapper error', e);
+}
+				// --- START: apply to page fields as well (call shared function if available) ---
+try {
+    if (typeof window.WCBalikovnaCheckout !== 'undefined' && typeof window.WCBalikovnaCheckout.applyBranchToFields === 'function') {
+        window.WCBalikovnaCheckout.applyBranchToFields(branchData);
+    } else if (typeof window.wcBalikovnaApplyBranch === 'function') {
+        window.wcBalikovnaApplyBranch(branchData);
+    } else {
+        console.log('WC Balíkovna DEBUG: applyBranchToFields not available yet, branch saved to hidden field');
+    }
+} catch (e) {
+    console.error('WC Balíkovna DEBUG: iframe applyBranchToFields error', e);
+}
+// --- END ---
                 
                 // Display selected branch info
                 var infoHtml = '<p style="margin: 5px 0;">' +
@@ -272,31 +298,60 @@ jQuery(function($) {
             return;
         }
 
-        // Save delivery type
-        $order->update_meta_data('_wc_balikovna_delivery_type', $delivery_type);
+// Save delivery type
+$order->update_meta_data('_wc_balikovna_delivery_type', $delivery_type);
 
-        if ($delivery_type === 'box' && !empty($_POST['wc_balikovna_branch'])) {
-            // Save branch data for Box type
-            $branch_json = sanitize_text_field(wp_unslash($_POST['wc_balikovna_branch']));
-            $branch_data = json_decode($branch_json, true);
-            
-            if ($branch_data && is_array($branch_data)) {
-                $order->update_meta_data('_wc_balikovna_branch_id', sanitize_text_field($branch_data['id']));
-                $order->update_meta_data('_wc_balikovna_branch_name', sanitize_text_field($branch_data['name']));
-                $order->update_meta_data('_wc_balikovna_branch_city', sanitize_text_field($branch_data['city']));
-                $order->update_meta_data('_wc_balikovna_branch_city_part', sanitize_text_field($branch_data['city_part'] ?? ''));
-                $order->update_meta_data('_wc_balikovna_branch_address', sanitize_text_field($branch_data['address']));
-                $order->update_meta_data('_wc_balikovna_branch_zip', sanitize_text_field($branch_data['zip']));
-                $order->update_meta_data('_wc_balikovna_branch_kind', sanitize_text_field($branch_data['kind']));
+// Box (výběr pobočky) -> ulož metadata a přepiš shipping pole v objednávce
+if ($delivery_type === 'box' && !empty($_POST['wc_balikovna_branch'])) {
+    // Necháme JSON dekódovat bez předběžného sanitize_text_field(), aby se nezničila struktura
+    $branch_json_raw = wp_unslash( $_POST['wc_balikovna_branch'] );
+    $branch_data = json_decode( $branch_json_raw, true );
+    
+    if ( $branch_data && is_array( $branch_data ) ) {
+        // Uložíme jednotlivá meta data pobočky
+        $order->update_meta_data('_wc_balikovna_branch_id', sanitize_text_field( $branch_data['id'] ?? '' ));
+        $order->update_meta_data('_wc_balikovna_branch_name', sanitize_text_field( $branch_data['name'] ?? '' ));
+        $order->update_meta_data('_wc_balikovna_branch_city', sanitize_text_field( $branch_data['city'] ?? '' ));
+        $order->update_meta_data('_wc_balikovna_branch_city_part', sanitize_text_field( $branch_data['city_part'] ?? '' ));
+        $order->update_meta_data('_wc_balikovna_branch_address', sanitize_text_field( $branch_data['address'] ?? '' ));
+        $order->update_meta_data('_wc_balikovna_branch_zip', sanitize_text_field( $branch_data['zip'] ?? '' ));
+        $order->update_meta_data('_wc_balikovna_branch_kind', sanitize_text_field( $branch_data['kind'] ?? '' ));
 
-                // Save to session for later use
-                WC()->session->set('wc_balikovna_selected_branch', $branch_json);
-            }
-        } else {
-            // Save flag for Address type
-            $order->update_meta_data('_wc_balikovna_address_delivery', 'yes');
+        // Uložíme vybranou pobočku do session (JSON)
+        WC()->session->set( 'wc_balikovna_selected_branch', wp_json_encode( $branch_data ) );
+
+        // --- Přepsání shipping polí přímo na objednávce (ponechá jméno zákazníka) ---
+        $street = isset( $branch_data['address'] ) ? sanitize_text_field( $branch_data['address'] ) : '';
+        $city   = isset( $branch_data['city'] ) ? sanitize_text_field( $branch_data['city'] ) : '';
+        $zip    = isset( $branch_data['zip'] ) ? sanitize_text_field( $branch_data['zip'] ) : '';
+        $branch_note = 'Balíkovna ID: ' . sanitize_text_field( $branch_data['id'] ?? '' ) . ' - ' . sanitize_text_field( $branch_data['name'] ?? '' );
+
+        if ( ! empty( $street ) ) {
+            $order->set_shipping_address_1( $street );
         }
+        if ( ! empty( $city ) ) {
+            $order->set_shipping_city( $city );
+        }
+        if ( ! empty( $zip ) ) {
+            $order->set_shipping_postcode( $zip );
+        }
+        // Uložíme poznámku do address_2
+        $order->set_shipping_address_2( $branch_note );
 
-        $order->save();
+        // (Volitelně) uložit poznámku i jako meta pro snadné filtrování
+        $order->update_meta_data('_wc_balikovna_branch_note', $branch_note);
+
+    } else {
+        // Pokud JSON nešel dekódovat, logneme pro debug
+        error_log('WC Balíkovna DEBUG: Invalid branch JSON in save_checkout_data for order ' . $order_id . ': ' . print_r( $_POST['wc_balikovna_branch'], true ));
+    }
+
+} else {
+    // Save flag for Address type
+    $order->update_meta_data('_wc_balikovna_address_delivery', 'yes');
+}
+
+// Uložíme objednávku (všechny změny meta i shipping polí)
+$order->save();
     }
 }

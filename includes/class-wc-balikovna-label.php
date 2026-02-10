@@ -90,70 +90,89 @@ class WC_Balikovna_Label
 
         ?>
         <div class="wc-balikovna-label-section" style="margin-top: 20px; padding: 15px; background: #f9f9f9; border: 1px solid #ddd;">
-            <h3><?php echo esc_html__('Štítek Balíkovny', 'wc-balikovna-komplet'); ?></h3>
-            
-            <?php if ($label_generated === 'yes' && !empty($label_url)) : ?>
-                <p>
-                    <strong><?php echo esc_html__('Štítek byl vygenerován:', 'wc-balikovna-komplet'); ?></strong><br>
-                    <a href="<?php echo esc_url($label_url); ?>" target="_blank" class="button">
-                        <?php echo esc_html__('Stáhnout štítek', 'wc-balikovna-komplet'); ?>
-                    </a>
-                </p>
-            <?php else : ?>
-                <p>
-                    <button type="button" class="button button-primary wc-balikovna-generate-label" data-order-id="<?php echo esc_attr($order->get_id()); ?>">
-                        <?php echo esc_html__('Generovat štítek', 'wc-balikovna-komplet'); ?>
-                    </button>
-                </p>
-                <div class="wc-balikovna-label-message" style="display: none; margin-top: 10px;"></div>
-            <?php endif; ?>
-        </div>
+    <h3><?php echo esc_html__('Štítek Balíkovny', 'wc-balikovna-komplet'); ?></h3>
 
-        <script>
-        jQuery(function($) {
-            $('.wc-balikovna-generate-label').on('click', function(e) {
-                e.preventDefault();
-                var button = $(this);
-                var orderId = button.data('order-id');
-                var messageDiv = $('.wc-balikovna-label-message');
-                
-                button.prop('disabled', true).text('<?php echo esc_js(__('Generuji...', 'wc-balikovna-komplet')); ?>');
-                messageDiv.hide().removeClass('notice-success notice-error');
-                
-                $.ajax({
-                    url: ajaxurl,
-                    type: 'POST',
-                    data: {
-                        action: 'wc_balikovna_generate_label',
-                        order_id: orderId,
-                        nonce: '<?php echo wp_create_nonce('wc_balikovna_label_nonce'); ?>'
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            messageDiv.addClass('notice notice-success')
-                                .html('<p>' + response.data.message + '</p>')
-                                .show();
-                            // Reload page after 2 seconds to show the download button
-                            setTimeout(function() {
-                                location.reload();
-                            }, 2000);
-                        } else {
-                            messageDiv.addClass('notice notice-error')
-                                .html('<p>' + response.data.message + '</p>')
-                                .show();
-                            button.prop('disabled', false).text('<?php echo esc_js(__('Generovat štítek', 'wc-balikovna-komplet')); ?>');
-                        }
-                    },
-                    error: function() {
-                        messageDiv.addClass('notice notice-error')
-                            .html('<p><?php echo esc_js(__('Došlo k chybě při komunikaci se serverem', 'wc-balikovna-komplet')); ?></p>')
-                            .show();
-                        button.prop('disabled', false).text('<?php echo esc_js(__('Generovat štítek', 'wc-balikovna-komplet')); ?>');
+    <div class="wc-balikovna-label-actions">
+        <?php if ($label_generated === 'yes' && !empty($label_url)) : ?>
+            <p class="wc-balikovna-download">
+                <strong><?php echo esc_html__('Štítek byl vygenerován:', 'wc-balikovna-komplet'); ?></strong><br>
+                <a href="<?php echo esc_url($label_url); ?>" target="_blank" class="button wc-balikovna-download-link">
+                    <?php echo esc_html__('Stáhnout štítek', 'wc-balikovna-komplet'); ?>
+                </a>
+            </p>
+            <p>
+                <button type="button" class="button button-secondary wc-balikovna-regenerate-label" data-order-id="<?php echo esc_attr($order->get_id()); ?>">
+                    <?php echo esc_html__('Regenerovat štítek', 'wc-balikovna-komplet'); ?>
+                </button>
+            </p>
+        <?php else : ?>
+            <p>
+                <button type="button" class="button button-primary wc-balikovna-generate-label" data-order-id="<?php echo esc_attr($order->get_id()); ?>">
+                    <?php echo esc_html__('Generovat štítek', 'wc-balikovna-komplet'); ?>
+                </button>
+            </p>
+        <?php endif; ?>
+        <div class="wc-balikovna-label-message" style="display: none; margin-top: 10px;"></div>
+    </div>
+</div>
+
+<script>
+jQuery(function($) {
+    function runLabelAjax(orderId, $button, $messageDiv) {
+        $button.prop('disabled', true);
+        $messageDiv.hide().removeClass('notice-success notice-error');
+
+        $.post(ajaxurl, {
+            action: 'wc_balikovna_generate_label',
+            order_id: orderId,
+            nonce: '<?php echo wp_create_nonce('wc_balikovna_label_nonce'); ?>'
+        }, function(response) {
+            if (response && response.success) {
+                $messageDiv.addClass('notice notice-success').html('<p>' + (response.data.message || '<?php echo esc_js(__('Štítek vygenerován', 'wc-balikovna-komplet')); ?>') + '</p>').show();
+
+                if (response.data && response.data.label_url) {
+                    var $dl = $('.wc-balikovna-download-link');
+                    if ($dl.length) {
+                        $dl.attr('href', response.data.label_url);
+                    } else {
+                        var $html = '<p class="wc-balikovna-download"><strong><?php echo esc_js(__('Štítek byl vygenerován:', 'wc-balikovna-komplet')); ?></strong><br>' +
+                                    '<a href="' + response.data.label_url + '" target="_blank" class="button wc-balikovna-download-link"><?php echo esc_js(__('Stáhnout štítek', 'wc-balikovna-komplet')); ?></a></p>';
+                        $('.wc-balikovna-label-actions').prepend($html);
                     }
-                });
-            });
+                }
+
+                setTimeout(function(){
+                    location.reload();
+                }, 1200);
+            } else {
+                var msg = (response && response.data && response.data.message) ? response.data.message : (response && response.message ? response.message : '<?php echo esc_js(__('Chyba při generování štítku', 'wc-balikovna-komplet')); ?>');
+                $messageDiv.addClass('notice notice-error').html('<p>' + msg + '</p>').show();
+                $button.prop('disabled', false);
+            }
+        }, 'json').fail(function(jqXHR, textStatus) {
+            $messageDiv.addClass('notice notice-error').html('<p><?php echo esc_js(__('Došlo k chybě při komunikaci se serverem', 'wc-balikovna-komplet')); ?></p>').show();
+            $button.prop('disabled', false);
         });
-        </script>
+    }
+
+    // generovat poprvé
+    $(document).on('click', '.wc-balikovna-generate-label', function(e) {
+        e.preventDefault();
+        var button = $(this), orderId = button.data('order-id'), messageDiv = $('.wc-balikovna-label-message');
+        runLabelAjax(orderId, button, messageDiv);
+    });
+
+    // regenerovat
+    $(document).on('click', '.wc-balikovna-regenerate-label', function(e) {
+        e.preventDefault();
+        var button = $(this), orderId = button.data('order-id'), messageDiv = $('.wc-balikovna-label-message');
+        if (!confirm('<?php echo esc_js(__('Opravdu chcete vygenerovat nový štítek? Starý bude nahrazen.', 'wc-balikovna-komplet')); ?>')) {
+            return;
+        }
+        runLabelAjax(orderId, button, messageDiv);
+    });
+});
+</script>
         <?php
     }
 
@@ -189,11 +208,21 @@ class WC_Balikovna_Label
         // Generate label
         $result = $this->generate_label($order);
 
-        if ($result['success']) {
-            wp_send_json_success(array('message' => $result['message']));
-        } else {
-            wp_send_json_error(array('message' => $result['message']));
+if ($result['success']) {
+    $resp = array('message' => $result['message']);
+    if (isset($result['label_url'])) {
+        $resp['label_url'] = $result['label_url'];
+    } else {
+        // pokusíme se načíst uloženou meta (fallback)
+        $label_url = $order->get_meta('_wc_balikovna_label_url');
+        if (!empty($label_url)) {
+            $resp['label_url'] = $label_url;
         }
+    }
+    wp_send_json_success($resp);
+} else {
+    wp_send_json_error(array('message' => $result['message']));
+}
     }
 
     /**
@@ -334,30 +363,44 @@ class WC_Balikovna_Label
         
         error_log('WC Balíkovna Label: Prepared data: ' . json_encode($data));
 
-        // Call API
-        $api_result = $this->call_api('label/generate', $data, $order);
+// --- Nahraď tento blok (místo volání API a zpracování výsledku) ---
+$prepared = $this->prepare_label_data( $order );
+if ( is_wp_error( $prepared ) ) {
+    return array(
+        'success' => false,
+        'message' => $prepared->get_error_message()
+    );
+}
 
-        if ($api_result['success']) {
-            // Save label info to order
-            $order->update_meta_data('_wc_balikovna_label_generated', 'yes');
-            $order->update_meta_data('_wc_balikovna_label_url', $api_result['label_url']);
-            $order->update_meta_data('_wc_balikovna_label_date', current_time('mysql'));
-            $order->save();
-            
-            error_log('WC Balíkovna Label: Label saved to order meta');
+$pdf_result = $this->build_pdf_from_template( $prepared );
+if ( is_wp_error( $pdf_result ) ) {
+    return array(
+        'success' => false,
+        'message' => $pdf_result->get_error_message()
+    );
+}
 
-            return array(
-                'success' => true,
-                'message' => __('Štítek byl úspěšně vygenerován', 'wc-balikovna-komplet')
-            );
-        } else {
-            return array(
-                'success' => false,
-                'message' => $api_result['message']
-            );
-        }
-    }
+if ( isset( $pdf_result['success'] ) && $pdf_result['success'] && ! empty( $pdf_result['url'] ) ) {
+    // Save label info to order
+    $order->update_meta_data('_wc_balikovna_label_generated', 'yes');
+    $order->update_meta_data('_wc_balikovna_label_url', $pdf_result['url']);
+    $order->update_meta_data('_wc_balikovna_label_date', current_time('mysql'));
+    $order->save();
 
+    error_log('WC Balíkovna Label: Label saved to order meta (generated PDF)');
+
+    return array(
+        'success' => true,
+        'label_url' => $pdf_result['url'],
+        'message' => __('Štítek byl úspěšně vygenerován', 'wc-balikovna-komplet')
+    );
+} else {
+    return array(
+        'success' => false,
+        'message' => __('Chyba při generování PDF štítku', 'wc-balikovna-komplet')
+    );
+	} 
+}
     /**
      * Generate label for Address delivery type
      *
@@ -418,29 +461,236 @@ class WC_Balikovna_Label
         
         error_log('WC Balíkovna Label: Prepared data: ' . json_encode($data));
 
-        // Call API
-        $api_result = $this->call_api('label/generate', $data, $order);
+      // --- Nahraď tento blok (místo volání API a zpracování výsledku) ---
+$prepared = $this->prepare_label_data( $order );
+if ( is_wp_error( $prepared ) ) {
+    return array(
+        'success' => false,
+        'message' => $prepared->get_error_message()
+    );
+}
 
-        if ($api_result['success']) {
-            // Save label info to order
-            $order->update_meta_data('_wc_balikovna_label_generated', 'yes');
-            $order->update_meta_data('_wc_balikovna_label_url', $api_result['label_url']);
-            $order->update_meta_data('_wc_balikovna_label_date', current_time('mysql'));
-            $order->save();
-            
-            error_log('WC Balíkovna Label: Label saved to order meta');
+$pdf_result = $this->build_pdf_from_template( $prepared );
+if ( is_wp_error( $pdf_result ) ) {
+    return array(
+        'success' => false,
+        'message' => $pdf_result->get_error_message()
+    );
+}
 
-            return array(
-                'success' => true,
-                'message' => __('Štítek byl úspěšně vygenerován', 'wc-balikovna-komplet')
-            );
-        } else {
-            return array(
-                'success' => false,
-                'message' => $api_result['message']
-            );
+if ( isset( $pdf_result['success'] ) && $pdf_result['success'] && ! empty( $pdf_result['url'] ) ) {
+    // Save label info to order
+    $order->update_meta_data('_wc_balikovna_label_generated', 'yes');
+    $order->update_meta_data('_wc_balikovna_label_url', $pdf_result['url']);
+    $order->update_meta_data('_wc_balikovna_label_date', current_time('mysql'));
+    $order->save();
+
+    error_log('WC Balíkovna Label: Label saved to order meta (generated PDF)');
+
+    return array(
+        'success' => true,
+        'label_url' => $pdf_result['url'],
+        'message' => __('Štítek byl úspěšně vygenerován', 'wc-balikovna-komplet')
+    );
+} else {
+    return array(
+        'success' => false,
+        'message' => __('Chyba při generování PDF štítku', 'wc-balikovna-komplet')
+    );
+	} 
+}
+
+// --- Přidat: pomocné metody pro přípravu dat a generování PDF (vložit PŘED metodou call_api) ---
+
+/**
+ * Připraví data pro štítek z objednávky.
+ *
+ * @param int|WC_Order $order_or_id
+ * @return array|WP_Error
+ */
+private function prepare_label_data( $order_or_id ) {
+    $order = is_object( $order_or_id ) ? $order_or_id : wc_get_order( intval( $order_or_id ) );
+
+    if ( ! $order ) {
+        return new WP_Error( 'order_not_found', 'Objednávka nenalezena' );
+    }
+
+    // Odesílatel (možno upravit z nastavení pluginu)
+    $sender = array(
+        'name'         => get_option( 'wc_balikovna_sender_name', 'SU~PR sušené | pražené' ),
+        'order_number' => $order->get_order_number() ?: $order->get_id(),
+    );
+
+    // Příjemce (ze shipping, fallback na billing)
+    $recipient = array(
+        'name'    => trim( $order->get_shipping_first_name() . ' ' . $order->get_shipping_last_name() ),
+        'street'  => $order->get_shipping_address_1() ?: $order->get_billing_address_1(),
+        'city'    => $order->get_shipping_city() ?: $order->get_billing_city(),
+        'zipCode' => $order->get_shipping_postcode() ?: $order->get_billing_postcode(),
+    );
+
+    if ( empty( $recipient['name'] ) || empty( $recipient['street'] ) || empty( $recipient['city'] ) || empty( $recipient['zipCode'] ) ) {
+        return new WP_Error( 'missing_recipient', 'Chybí některé povinné údaje příjemce' );
+    }
+
+    // Spočítat hmotnost (WooCommerce: obvykle v kg)
+    $weight = 0.0;
+    foreach ( $order->get_items() as $item ) {
+        $product = $item->get_product();
+        $qty     = $item->get_quantity();
+        if ( $product ) {
+            $prod_weight = $product->get_weight();
+            $prod_weight = $prod_weight ? floatval( $prod_weight ) : 0.0;
+            $weight += $prod_weight * $qty;
         }
     }
+    if ( $weight <= 0 ) {
+        $weight = 1.0;
+    }
+
+    return array(
+        'sender'    => $sender,
+        'recipient' => $recipient,
+        'weight'    => number_format( $weight, 3, '.', '' ),
+    );
+}
+
+/**
+ * Vytvoří PDF štítek z template (FPDI + TCPDF nebo FPDI+FPDF fallback).
+ *
+ * @param array $data Výstup z prepare_label_data()
+ * @return array|WP_Error ['success'=>true,'url'=>'...'] nebo WP_Error
+ */
+private function build_pdf_from_template( $data ) {
+	// --- TEST: jednoduché rychlé PDF (izolace zápisu) ---
+try {
+    // pokusíme se použít TCPDF pokud existuje
+    if ( class_exists('\TCPDF') ) {
+        $upload_dir = wp_upload_dir();
+        $dir = trailingslashit( $upload_dir['basedir'] ) . 'wc-balikovna-labels';
+        if ( ! file_exists( $dir ) ) {
+            wp_mkdir_p( $dir );
+            error_log('WC Balíkovna DEBUG: Created labels dir: ' . $dir);
+        }
+        $test_file = trailingslashit( $dir ) . 'test_simple_' . time() . '.pdf';
+        try {
+            $testPdf = new \TCPDF('P','mm','A4');
+            $testPdf->SetCreator('WC Balikovna Test');
+            $testPdf->SetAuthor(get_bloginfo('name'));
+            $testPdf->SetTitle('Test PDF');
+            $testPdf->SetPrintHeader(false);
+            $testPdf->SetPrintFooter(false);
+            $testPdf->AddPage();
+            // pro test nepoužívej diakritiku aby se vyloučil font problém
+            $testPdf->SetFont('helvetica','',12);
+            $testPdf->Write(0, 'TEST - tento text se má zobrazit v PDF. order:' . ($data['sender']['order_number'] ?? 'unknown'));
+            $testPdf->Output($test_file, 'F');
+            error_log('WC Balíkovna DEBUG: Test PDF generated: ' . $test_file);
+            // vrátíme úspěch, aby se proces zastavil a bylo jasné, že zápis funguje
+            return array('success' => true, 'url' => trailingslashit($upload_dir['baseurl']) . 'wc-balikovna-labels/' . basename($test_file), 'message' => 'Test PDF generated');
+        } catch (Exception $e) {
+            error_log('WC Balíkovna DEBUG: Test PDF exception: ' . $e->getMessage());
+            // pokud padne, pokračujeme do normálního flow
+        }
+    } else {
+        error_log('WC Balíkovna DEBUG: TCPDF class not found (class_exists returned false).');
+    }
+} catch (Exception $e) {
+    error_log('WC Balíkovna DEBUG: Unexpected test exception: ' . $e->getMessage());
+}
+    $autoload = WC_BALIKOVNA_PLUGIN_DIR . 'vendor/autoload.php';
+    $tcpdf_in_plugin = WC_BALIKOVNA_PLUGIN_DIR . 'tcpdf/tcpdf.php';
+    $fpdi_in_plugin = WC_BALIKOVNA_PLUGIN_DIR . 'fpdi/src/autoload.php';
+
+    if ( file_exists( $autoload ) ) {
+        require_once $autoload;
+    } else {
+        if ( file_exists( $fpdi_in_plugin ) ) {
+            require_once $fpdi_in_plugin;
+        }
+        if ( file_exists( $tcpdf_in_plugin ) ) {
+            require_once $tcpdf_in_plugin;
+        }
+    }
+
+    if ( ! class_exists( '\setasign\Fpdi\Tcpdf\Fpdi' ) && ! class_exists( '\setasign\Fpdi\Fpdi' ) ) {
+        return new WP_Error( 'missing_lib', 'FPDI/TCPDF knihovny nejsou dostupné. Nainstalujte závislosti (composer require setasign/fpdi-tcpdf) nebo přidejte knihovny do pluginu.' );
+    }
+
+    try {
+        $template_path = WC_BALIKOVNA_PLUGIN_DIR . 'assets/template.pdf';
+        if ( ! file_exists( $template_path ) ) {
+            return new WP_Error( 'template_missing', 'Šablona PDF nebyla nalezena: assets/template.pdf' );
+        }
+
+        // Instantiate appropriate FPDI class
+        if ( class_exists( '\setasign\Fpdi\Tcpdf\Fpdi' ) ) {
+            $pdf = new \setasign\Fpdi\Tcpdf\Fpdi();
+        } elseif ( class_exists( '\setasign\Fpdi\Fpdi' ) ) {
+            $pdf = new \setasign\Fpdi\Fpdi();
+        } else {
+            return new WP_Error( 'no_pdf_engine', 'Nevhodná PDF knihovna' );
+        }
+
+        // Metadata (pokud dostupné)
+        if ( method_exists( $pdf, 'SetCreator' ) ) {
+            $pdf->SetCreator( 'WooCommerce Balíkovna' );
+            $pdf->SetAuthor( get_bloginfo( 'name' ) );
+            $pdf->SetTitle( 'Balíkovna - Adresní štítek' );
+        }
+        if ( method_exists( $pdf, 'SetPrintHeader' ) ) {
+            $pdf->SetPrintHeader( false );
+            $pdf->SetPrintFooter( false );
+        }
+
+        // Načteme template a vykreslíme
+        $pageCount = $pdf->setSourceFile( $template_path );
+        $tplId = $pdf->importPage( 1 );
+
+        $pdf->AddPage();
+        $pdf->useTemplate( $tplId, 0, 0 );
+
+        // Font (TCPDF podporuje UTF-8)
+        if ( method_exists( $pdf, 'SetFont' ) ) {
+            $pdf->SetFont( 'dejavusans', '', 10 );
+        }
+
+        $maxWidth = 85; // uprav dle šablony
+
+        // --- Vykreslení polí (souřadnice uprav podle vaší šablony) ---
+        $pdf->SetXY( 12, 23 );
+        $pdf->MultiCell( $maxWidth, 5, wp_strip_all_tags( $data['sender']['name'] ), 0, 'L' );
+        $pdf->SetXY( 12, $pdf->GetY() + 2 );
+        $pdf->MultiCell( $maxWidth, 5, 'Objednávka č.: ' . wp_strip_all_tags( $data['sender']['order_number'] ), 0, 'L' );
+
+        $pdf->SetXY( 12, 45 );
+        $pdf->MultiCell( $maxWidth, 5, wp_strip_all_tags( $data['recipient']['name'] ), 0, 'L' );
+        $pdf->SetXY( 12, $pdf->GetY() + 2 );
+        $pdf->MultiCell( $maxWidth, 5, wp_strip_all_tags( $data['recipient']['street'] ), 0, 'L' );
+        $pdf->SetXY( 12, $pdf->GetY() + 2 );
+        $pdf->MultiCell( $maxWidth, 5, wp_strip_all_tags( $data['recipient']['city'] . ' ' . $data['recipient']['zipCode'] ), 0, 'L' );
+
+        $pdf->SetXY( 12, $pdf->GetY() + 8 );
+        $pdf->MultiCell( $maxWidth, 5, 'Hmotnost zásilky: ' . $data['weight'] . ' kg', 0, 'L' );
+
+        // Uložit do uploads
+        $upload_dir = wp_upload_dir();
+        $dir = trailingslashit( $upload_dir['basedir'] ) . 'wc-balikovna-labels';
+        if ( ! file_exists( $dir ) ) {
+            wp_mkdir_p( $dir );
+        }
+        $filename = 'balikovna_label_' . sanitize_file_name( (string) $data['sender']['order_number'] ) . '_' . time() . '.pdf';
+        $filepath = trailingslashit( $dir ) . $filename;
+
+        $pdf->Output( $filepath, 'F' );
+
+        $url = trailingslashit( $upload_dir['baseurl'] ) . 'wc-balikovna-labels/' . $filename;
+        return array( 'success' => true, 'url' => $url );
+
+    } catch ( Exception $e ) {
+        return new WP_Error( 'pdf_error', 'Chyba při generování PDF: ' . $e->getMessage() );
+    }
+}
 
     /**
      * Call API endpoint
