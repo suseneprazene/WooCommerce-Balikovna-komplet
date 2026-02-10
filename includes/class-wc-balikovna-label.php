@@ -869,27 +869,59 @@ $y = $pdf->GetY() + 5;
 $img_w = 20; // šířka v mm (uprav dle potřeby)
 $img_h = 10; // výška v mm (uprav dle potřeby)
 
-// Formát hmotnosti pro zobrazení: inteligentně podle nastavení WC nebo podle velikosti zásilky
-// $data['weight'] by měl být v kilogramech (float)
+// Robustní formátování hmotnosti pro zobrazení (obr. piktogram)
+// $data['weight'] může být v kg nebo (chybn\ě) v g — provádíme detekci a zobrazíme podle nastavení obchodu.
+
 $weight_display = '';
-if ( isset( $data['weight'] ) && is_numeric( $data['weight'] ) ) {
-    $weight_kg = (float) $data['weight'];
+if ( isset( $data['weight'] ) && $data['weight'] !== '' ) {
+
+    // normalizace vstupu na číslo (float) — nahradíme čárku tečkou pro floatval
+    $raw = (string) $data['weight'];
+    $raw_normalized = str_replace( ',', '.', $raw );
+    $raw_float = floatval( $raw_normalized );
 
     // zjištění jednotky v nastavení WooCommerce
-    $store_unit = get_option( 'woocommerce_weight_unit', 'kg' ); // 'kg' nebo 'g' nejčastěji
+    $store_unit = strtolower( trim( get_option( 'woocommerce_weight_unit', 'kg' ) ) ); // 'kg' nebo 'g' apod.
 
-    // Normalizace zkratek
-    $unit = strtolower( trim( $store_unit ) );
+    // Heuristika: zjistíme, zda vstup vypadá jako "kg" (tzn. má desetinnou část nebo je velmi malé <10)
+    // nebo jako "g" (celé číslo typicky >=1)
+    $looks_like_fractional = ( abs( $raw_float - floor( $raw_float ) ) > 0.000001 ); // má desetinnou část
+    $looks_large_number = ( $raw_float > 1000 ); // např. 150000 -> určitě g
 
-    if ( $unit === 'g' || $unit === 'gram' || $unit === 'grams' ) {
-        // obchod má nastaveno gramy -> zobrazit gramy (celé číslo)
+    // Normalizovat vstup na kg pro vnitřní logiku:
+    // - pokud vstup vypadá jako velmi velké číslo (>1000) => předpokládejme gramy a převeď na kg
+    // - pokud obchod má unit 'g' a vstup je celé číslo (bez desetinné části) => pravděpodobně je to gramy -> převeď na kg
+    // - pokud vstup má desetinnou část -> pravděpodobně jde o kg (např. 0.15)
+    if ( $looks_large_number ) {
+        // určitě g
+        $weight_kg = $raw_float / 1000.0;
+    } elseif ( $store_unit === 'g' && ! $looks_like_fractional ) {
+        // obchod v gramech a vstup je celé číslo => pravděpodobně grams value
+        $weight_kg = $raw_float / 1000.0;
+    } elseif ( $looks_like_fractional && $raw_float < 10 ) {
+        // má desetinnou část a není obří => pravděpodobně kg (např. 0.15)
+        $weight_kg = $raw_float;
+    } else {
+        // fallback: pokud hodnota menší než 5 a má desetinnou část => kg,
+        // jinak pokud je menší než 5 a bez desetinné části může to být g nebo kg -> použij heuristiku podle store_unit
+        if ( $store_unit === 'g' && $raw_float >= 1 ) {
+            // preferuj gramy pokud obchod používá gramy
+            $weight_kg = $raw_float / 1000.0;
+        } else {
+            $weight_kg = $raw_float;
+        }
+    }
+
+    // Teď máme $weight_kg jako float (kg). Rozhodneme, jak zobrazit:
+    if ( $store_unit === 'g' ) {
+        // obchod preferuje gramy -> zobraz v g (celé číslo)
         $weight_g = round( $weight_kg * 1000 );
         $weight_display = number_format( $weight_g, 0, ',', '' );
-    } elseif ( $unit === 'kg' || $unit === 'kilogram' || $unit === 'kilograms' ) {
-        // obchod má nastaveno kg -> zobrazit kg s 2 desetinnými místy
+    } elseif ( $store_unit === 'kg' ) {
+        // obchod preferuje kg -> zobraz s 2 des. místy
         $weight_display = number_format( $weight_kg, 2, ',', '' );
     } else {
-        // fallback: heuristika podle velikosti
+        // fallback heuristika: pokud <1 kg -> g else kg
         if ( $weight_kg < 1.0 ) {
             $weight_g = round( $weight_kg * 1000 );
             $weight_display = number_format( $weight_g, 0, ',', '' );
@@ -897,9 +929,11 @@ if ( isset( $data['weight'] ) && is_numeric( $data['weight'] ) ) {
             $weight_display = number_format( $weight_kg, 2, ',', '' );
         }
     }
+
+    // volitelně debug (odkomentuj pro logování)
+    // error_log('WC Balíkovna DEBUG: raw=' . $raw . ' raw_float=' . $raw_float . ' normalized_kg=' . $weight_kg . ' display=' . $weight_display . ' store_unit=' . $store_unit);
 } else {
-    // neznámá/nesprávná váha -> fallback text/původní hodnota
-    $weight_display = isset( $data['weight'] ) ? (string) $data['weight'] : '';
+    $weight_display = '';
 }
 
 if ( file_exists( $img_path ) ) {
