@@ -233,7 +233,10 @@ class WC_Balikovna_Admin
                     <?php if ($last_sync) : ?>
                         <p>
                             <strong><?php esc_html_e('Poslední aktualizace:', 'wc-balikovna-komplet'); ?></strong>
-                            <?php echo esc_html(date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $last_sync)); ?>
+<?php
+// Formát: datum podle WP nastavení + 24h čas HH:MM
+echo esc_html( date_i18n( get_option('date_format') . ' H:i', intval( $last_sync ) ) );
+?>
                             <?php if ($last_count) : ?>
                                 <br>
                                 <em><?php echo sprintf(esc_html__('(Importováno %d poboček)', 'wc-balikovna-komplet'), intval($last_count)); ?></em>
@@ -264,11 +267,15 @@ class WC_Balikovna_Admin
                     <label><?php esc_html_e('Synchronizace dat', 'wc-balikovna-komplet'); ?></label>
                 </th>
                 <td class="forminp">
-                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                        <input type="hidden" name="action" value="wc_balikovna_sync">
-                        <?php wp_nonce_field('wc_balikovna_sync'); ?>
-                        <?php submit_button(__('Aktualizovat pobočky', 'wc-balikovna-komplet'), 'primary', 'submit', false); ?>
-                    </form>
+<?php
+// Připravíme URL s nonce
+$sync_url = wp_nonce_url( admin_url('admin-post.php?action=wc_balikovna_sync'), 'wc_balikovna_sync' );
+?>
+<p>
+    <a href="<?php echo esc_url( $sync_url ); ?>" class="button button-primary" onclick="return confirm('<?php echo esc_js(__('Opravdu chcete stáhnout a importovat data poboček? Tento proces může trvat několik minut.', 'wc-balikovna-komplet')); ?>');">
+        <?php esc_html_e('Aktualizovat pobočky', 'wc-balikovna-komplet'); ?>
+    </a>
+</p>
                     <p class="description">
                         <?php esc_html_e('Načte aktuální data poboček z API České pošty. Proces může trvat několik minut.', 'wc-balikovna-komplet'); ?>
                     </p>
