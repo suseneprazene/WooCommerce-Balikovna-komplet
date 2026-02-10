@@ -1,105 +1,131 @@
-/**
- * WooCommerce Balikovna Panel Toggle
- *
- * Toggles visibility of branch selection panel and address delivery panel
- * based on selected shipping method.
- */
-
 (function ($) {
     'use strict';
 
-    var WCBalikovnaToggle = {
-        /**
-         * Initialize
-         */
-        init: function () {
-            this.bindEvents();
-            // Run on page load
-            this.togglePanels();
-        },
+    function observeShippingMethods() {
 
-        /**
-         * Bind events
-         */
-        bindEvents: function () {
-            var self = this;
+        function getContainerForInput($input) {
+            // Pokusíme se nejprve vybrat přímého potomka .shipping-method__after-shipping-rate
+            var $li = $input.closest('li');
+            var $container = $li.children('.shipping-method__after-shipping-rate');
 
-            // Listen to shipping method changes
-            $(document.body).on('change', 'input[name^="shipping_method"]', function () {
-                self.togglePanels();
-            });
-
-            // Listen to WooCommerce checkout update event
-            $(document.body).on('updated_checkout', function () {
-                self.togglePanels();
-            });
-        },
-
-        /**
-         * Toggle panels based on selected shipping method
-         */
-        togglePanels: function () {
-            var selectedMethod = $('input[name^="shipping_method"]:checked').val();
-            
-            // Find all Balíkovna panels
-            var $branchPanel = $('.wc-balikovna-branch-selection');
-            var $addressPanel = $('.wc-balikovna-address-notice');
-            
-            console.log('WC Balíkovna Toggle: Selected method:', selectedMethod);
-            
-            if (!selectedMethod) {
-                // No method selected, hide both
-                $branchPanel.hide();
-                $addressPanel.hide();
-                return;
+            // fallback: najít první .shipping-method__after-shipping-rate uvnitř li (pokud není child)
+            if ($container.length === 0) {
+                $container = $li.find('.shipping-method__after-shipping-rate').first();
             }
-            
-            // Check if it's a Balíkovna shipping method
-            if (selectedMethod.indexOf('balikovna') === -1) {
-                // Not a Balíkovna method, hide both panels
-                $branchPanel.hide();
-                $addressPanel.hide();
-                console.log('WC Balíkovna Toggle: Not a Balíkovna method, hiding both panels');
-                return;
+
+            // poslední fallback: najít pluginové třídy uvnitř li
+            if ($container.length === 0) {
+                $container = $li.find('.wc-balikovna-branch-selection, .wc-balikovna-address-notice').closest('.shipping-method__after-shipping-rate');
             }
-            
-            // It's a Balíkovna method - determine which type
-            // Check which panel exists - this tells us the delivery type
-            if ($branchPanel.length > 0 && $addressPanel.length === 0) {
-                // Only branch selection panel exists = "Do boxu" type
-                $branchPanel.show();
-                console.log('WC Balíkovna Toggle: Showing branch selection panel (box delivery)');
-            } else if ($addressPanel.length > 0 && $branchPanel.length === 0) {
-                // Only address panel exists = "Na adresu" type
-                $addressPanel.show();
-                console.log('WC Balíkovna Toggle: Showing address delivery panel');
-            } else if ($branchPanel.length > 0 && $addressPanel.length > 0) {
-                // Both panels exist (shouldn't happen in normal use, but handle it)
-                // Check which one has the hidden delivery type field to determine which to show
-                var $branchInput = $branchPanel.find('input[name="wc_balikovna_delivery_type"][value="box"]');
-                var $addressInput = $addressPanel.find('input[name="wc_balikovna_delivery_type"][value="address"]');
-                
-                if ($branchInput.length > 0) {
-                    $branchPanel.show();
-                    $addressPanel.hide();
-                    console.log('WC Balíkovna Toggle: Multiple panels found, showing branch panel');
-                } else if ($addressInput.length > 0) {
-                    $addressPanel.show();
-                    $branchPanel.hide();
-                    console.log('WC Balíkovna Toggle: Multiple panels found, showing address panel');
-                } else {
-                    // Fallback: show branch panel by default
-                    $branchPanel.show();
-                    $addressPanel.hide();
-                    console.log('WC Balíkovna Toggle: Fallback - showing branch panel');
+
+            return $container;
+        }
+
+        function forceHide($el) {
+            if (!$el || !$el.length) return;
+            $el.get(0).style.setProperty('display', 'none', 'important');
+            $el.attr('aria-hidden', 'true');
+        }
+
+        function forceShow($el, displayType) {
+            if (!$el || !$el.length) return;
+            var disp = displayType || 'block';
+            $el.get(0).style.setProperty('display', disp, 'important');
+            $el.attr('aria-hidden', 'false');
+        }
+
+        function updateShippingContentVisibility() {
+            // Re-query všech inputů (důležité — DOM může být překreslen)
+            var $allShippingInputs = $('input[name^="shipping_method"]');
+            var $checked = $allShippingInputs.filter(':checked');
+            var selectedVal = $checked.val() || null;
+
+            console.log('🔄 updateShippingContentVisibility — selected:', selectedVal);
+
+            // Najdeme konkrétní pluginové inputy (re-query)
+            var $boxInput = $('input[name^="shipping_method"][value="balikovna:2"]');
+            var $addrInput = $('input[name^="shipping_method"][value="balikovna:3"]');
+
+            // Najdeme jejich kontejnery dynamicky
+            var $boxContainer = getContainerForInput($boxInput);
+            var $addrContainer = getContainerForInput($addrInput);
+
+            console.log(' - boxInput found:', $boxInput.length, ' addrInput found:', $addrInput.length);
+            console.log(' - boxContainer found:', $boxContainer.length, ' addrContainer found:', $addrContainer.length);
+
+            // Default: natvrdo schovat oba pluginové kontejnery
+            forceHide($boxContainer);
+            forceHide($addrContainer);
+
+            // Zobrazit pouze aktuální
+            if (selectedVal === 'balikovna:2') {
+                console.log('📦 Vybrána balikovna:2 — zobrazím box, skryju adresu');
+                forceShow($boxContainer, 'block');
+                forceHide($addrContainer);
+            }
+            else if (selectedVal === 'balikovna:3') {
+                console.log('📬 Vybrána balikovna:3 — zobrazím adresu, skryju box');
+                forceShow($addrContainer, 'block');
+                forceHide($boxContainer);
+            }
+            else {
+                console.log('🔒 Jiná metoda — pluginové panely skryty');
+                forceHide($boxContainer);
+                forceHide($addrContainer);
+            }
+
+            // Debug: vypišeme konečný stav viditelnosti
+            console.log(' -> box visible:', $boxContainer.is(':visible'), ' addr visible:', $addrContainer.is(':visible'));
+
+            // (volitelně) pošlete debug přes AJAX pokud máte wc_balikovna_ajaxurl definovanou
+            if (typeof wc_balikovna_ajaxurl !== 'undefined') {
+                try {
+                    var payload = [];
+                    $allShippingInputs.each(function () {
+                        var $inp = $(this);
+                        var $cont = getContainerForInput($inp);
+                        payload.push({
+                            methodID: $inp.val(),
+                            selected: $inp.is(':checked'),
+                            visible: $cont.length ? $cont.is(':visible') : false,
+                            display: $cont.length ? $cont.css('display') : null
+                        });
+                    });
+
+                    // jednoduchý POST (nepřeháníme to)
+                    $.post(wc_balikovna_ajaxurl, {
+                        action: 'log_shipping_debug_data',
+                        data: payload
+                    }).fail(function (err) {
+                        console.warn('WC Balíkovna debug AJAX fail', err);
+                    });
+                } catch (e) {
+                    console.warn('WC Balíkovna debug AJAX exception', e);
                 }
             }
         }
-    };
 
-    // Initialize on document ready
+        // Reagujeme na změnu (klik) a updated_checkout (AJAX)
+        $(document.body).on('change', 'input[name^="shipping_method"]', function () {
+            console.log('🔔 change event detected');
+            // malé zpoždění pro jistotu, pokud se checkbox mění skrze JS
+            setTimeout(updateShippingContentVisibility, 10);
+        });
+
+        $(document.body).on('updated_checkout', function () {
+            console.log('🔔 updated_checkout event detected — waiting for DOM render');
+            setTimeout(updateShippingContentVisibility, 120);
+        });
+
+        // Inicializace při načtení stránky
+        $(document).ready(function () {
+            console.log('🚦 Inicializuji ovládání dopravy (initial run).');
+            setTimeout(updateShippingContentVisibility, 60);
+        });
+    }
+
     $(document).ready(function () {
-        WCBalikovnaToggle.init();
+        observeShippingMethods();
     });
 
 })(jQuery);
