@@ -1,131 +1,134 @@
 (function ($) {
     'use strict';
 
-    function observeShippingMethods() {
-
-        function getContainerForInput($input) {
-            // Pokusíme se nejprve vybrat přímého potomka .shipping-method__after-shipping-rate
-            var $li = $input.closest('li');
-            var $container = $li.children('.shipping-method__after-shipping-rate');
-
-            // fallback: najít první .shipping-method__after-shipping-rate uvnitř li (pokud není child)
-            if ($container.length === 0) {
-                $container = $li.find('.shipping-method__after-shipping-rate').first();
-            }
-
-            // poslední fallback: najít pluginové třídy uvnitř li
-            if ($container.length === 0) {
-                $container = $li.find('.wc-balikovna-branch-selection, .wc-balikovna-address-notice').closest('.shipping-method__after-shipping-rate');
-            }
-
-            return $container;
+    // Pomocné funkce
+    function getContainerForInput($input) {
+        if (!$input || $input.length === 0) return $();
+        var $li = $input.closest('li');
+        var $container = $li.children('.shipping-method__after-shipping-rate');
+        if ($container.length === 0) {
+            $container = $li.find('.shipping-method__after-shipping-rate').first();
         }
-
-        function forceHide($el) {
-            if (!$el || !$el.length) return;
-            $el.get(0).style.setProperty('display', 'none', 'important');
-            $el.attr('aria-hidden', 'true');
+        if ($container.length === 0) {
+            $container = $li.find('.wc-balikovna-branch-selection, .wc-balikovna-address-notice').closest('.shipping-method__after-shipping-rate');
         }
+        return $container;
+    }
 
-        function forceShow($el, displayType) {
-            if (!$el || !$el.length) return;
-            var disp = displayType || 'block';
-            $el.get(0).style.setProperty('display', disp, 'important');
-            $el.attr('aria-hidden', 'false');
-        }
-
-        function updateShippingContentVisibility() {
-            // Re-query všech inputů (důležité — DOM může být překreslen)
-            var $allShippingInputs = $('input[name^="shipping_method"]');
-            var $checked = $allShippingInputs.filter(':checked');
-            var selectedVal = $checked.val() || null;
-
-            console.log('🔄 updateShippingContentVisibility — selected:', selectedVal);
-
-            // Najdeme konkrétní pluginové inputy (re-query)
-            var $boxInput = $('input[name^="shipping_method"][value="balikovna:2"]');
-            var $addrInput = $('input[name^="shipping_method"][value="balikovna:3"]');
-
-            // Najdeme jejich kontejnery dynamicky
-            var $boxContainer = getContainerForInput($boxInput);
-            var $addrContainer = getContainerForInput($addrInput);
-
-            console.log(' - boxInput found:', $boxInput.length, ' addrInput found:', $addrInput.length);
-            console.log(' - boxContainer found:', $boxContainer.length, ' addrContainer found:', $addrContainer.length);
-
-            // Default: natvrdo schovat oba pluginové kontejnery
-            forceHide($boxContainer);
-            forceHide($addrContainer);
-
-            // Zobrazit pouze aktuální
-            if (selectedVal === 'balikovna:2') {
-                console.log('📦 Vybrána balikovna:2 — zobrazím box, skryju adresu');
-                forceShow($boxContainer, 'block');
-                forceHide($addrContainer);
-            }
-            else if (selectedVal === 'balikovna:3') {
-                console.log('📬 Vybrána balikovna:3 — zobrazím adresu, skryju box');
-                forceShow($addrContainer, 'block');
-                forceHide($boxContainer);
-            }
-            else {
-                console.log('🔒 Jiná metoda — pluginové panely skryty');
-                forceHide($boxContainer);
-                forceHide($addrContainer);
-            }
-
-            // Debug: vypišeme konečný stav viditelnosti
-            console.log(' -> box visible:', $boxContainer.is(':visible'), ' addr visible:', $addrContainer.is(':visible'));
-
-            // (volitelně) pošlete debug přes AJAX pokud máte wc_balikovna_ajaxurl definovanou
-            if (typeof wc_balikovna_ajaxurl !== 'undefined') {
-                try {
-                    var payload = [];
-                    $allShippingInputs.each(function () {
-                        var $inp = $(this);
-                        var $cont = getContainerForInput($inp);
-                        payload.push({
-                            methodID: $inp.val(),
-                            selected: $inp.is(':checked'),
-                            visible: $cont.length ? $cont.is(':visible') : false,
-                            display: $cont.length ? $cont.css('display') : null
-                        });
-                    });
-
-                    // jednoduchý POST (nepřeháníme to)
-                    $.post(wc_balikovna_ajaxurl, {
-                        action: 'log_shipping_debug_data',
-                        data: payload
-                    }).fail(function (err) {
-                        console.warn('WC Balíkovna debug AJAX fail', err);
-                    });
-                } catch (e) {
-                    console.warn('WC Balíkovna debug AJAX exception', e);
-                }
-            }
-        }
-
-        // Reagujeme na změnu (klik) a updated_checkout (AJAX)
-        $(document.body).on('change', 'input[name^="shipping_method"]', function () {
-            console.log('🔔 change event detected');
-            // malé zpoždění pro jistotu, pokud se checkbox mění skrze JS
-            setTimeout(updateShippingContentVisibility, 10);
-        });
-
-        $(document.body).on('updated_checkout', function () {
-            console.log('🔔 updated_checkout event detected — waiting for DOM render');
-            setTimeout(updateShippingContentVisibility, 120);
-        });
-
-        // Inicializace při načtení stránky
-        $(document).ready(function () {
-            console.log('🚦 Inicializuji ovládání dopravy (initial run).');
-            setTimeout(updateShippingContentVisibility, 60);
+    function forceHide($el) {
+        if (!$el || !$el.length) return;
+        $el.each(function () {
+            try {
+                this.style.setProperty('display', 'none', 'important');
+                this.setAttribute('aria-hidden', 'true');
+            } catch (e) {}
         });
     }
 
+    function forceShow($el, displayType) {
+        if (!$el || !$el.length) return;
+        var disp = displayType || 'block';
+        $el.each(function () {
+            try {
+                this.style.setProperty('display', disp, 'important');
+                this.setAttribute('aria-hidden', 'false');
+            } catch (e) {}
+        });
+    }
+
+    // Hlavní logika: najdi všechny balikovna inputy a zobraz jen vybraný kontejner
+    function updateBalikovnaVisibility(reason) {
+        var $all = $('input[name^="shipping_method"]');
+        var $balikovnaInputs = $all.filter(function () {
+            var v = $(this).val() || '';
+            return v.indexOf('balikovna:') === 0;
+        });
+
+        var $checked = $balikovnaInputs.filter(':checked');
+        var selectedVal = $checked.val() || null;
+
+        console.log('🔄 balikovna update — reason:', reason || '', ' selected:', selectedVal, ' balikovna count:', $balikovnaInputs.length);
+
+        // Najdi a skryj všechny balikovna kontejnery natvrdo
+        var containers = $();
+        $balikovnaInputs.each(function () {
+            var $inp = $(this);
+            containers = containers.add(getContainerForInput($inp));
+        });
+        // Unikátní set
+        containers = containers.filter(function (i, el) { return el; });
+
+        // Skryj všechny
+        forceHide(containers);
+
+        // Zobraz pouze ten, který je checked
+        if (selectedVal) {
+            // Najít container pro ten checked
+            var $selCont = getContainerForInput($checked);
+            if ($selCont.length) {
+                console.log('📍 Zobrazuji kontainer pro', selectedVal);
+                forceShow($selCont, 'block');
+            } else {
+                console.log('⚠️ Nelze najít container pro vybraný balikovna input:', selectedVal);
+            }
+        } else {
+            console.log('🔒 Žádný balikovna input není vybrán - všechny balikovna kontejnery skryty');
+        }
+
+        // debug state
+        containers.each(function () {
+            var $c = $(this);
+            console.log(' - container for:', $c.closest('li').find('input[name^="shipping_method"]').val(), ' visible:', $c.is(':visible'), ' display:', $c.css('display'));
+        });
+    }
+
+    // Enforce s retrys pro případ, že něco přepíše později
+    function enforceWithRetries(reason) {
+        updateBalikovnaVisibility(reason + ' initial');
+        [80, 200, 600].forEach(function (d) {
+            setTimeout(function () {
+                updateBalikovnaVisibility(reason + ' retry ' + d);
+            }, d);
+        });
+    }
+
+    // Eventy
+    $(document.body).on('change', 'input[name^="shipping_method"]', function () {
+        setTimeout(function () { updateBalikovnaVisibility('change'); }, 10);
+    });
+
+    $(document.body).on('updated_checkout', function () {
+        // Po AJAX renderu počkáme, poté zkusíme opakovaně vymoci pravidlo
+        setTimeout(function () {
+            enforceWithRetries('updated_checkout');
+        }, 80);
+    });
+
+    // MutationObserver: pokud DOM mění jiný skript, zareagujeme
+    var observer = null;
+    function createObserver() {
+        var target = document.querySelector('form.checkout') || document.body;
+        if (observer) {
+            try { observer.disconnect(); } catch (e) {}
+        }
+        observer = new MutationObserver(function () {
+            // rychlé přepočítání, ale debounced by mohl být lepší
+            setTimeout(function () { updateBalikovnaVisibility('mutation'); }, 20);
+        });
+        observer.observe(target, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'aria-hidden'] });
+    }
+
     $(document).ready(function () {
-        observeShippingMethods();
+        // initial run a observer
+        setTimeout(function () { enforceWithRetries('page_load'); }, 50);
+        createObserver();
+    });
+
+    // clean-up
+    $(window).on('beforeunload', function () {
+        if (observer) {
+            try { observer.disconnect(); } catch (e) {}
+        }
     });
 
 })(jQuery);
