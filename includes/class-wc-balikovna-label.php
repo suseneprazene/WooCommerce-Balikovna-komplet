@@ -521,13 +521,14 @@ private function prepare_label_data( $order_or_id ) {
         'order_number' => $order->get_order_number() ?: $order->get_id(),
     );
 
-    // Příjemce (ze shipping, fallback na billing)
-    $recipient = array(
-        'name'    => trim( $order->get_shipping_first_name() . ' ' . $order->get_shipping_last_name() ),
-        'street'  => $order->get_shipping_address_1() ?: $order->get_billing_address_1(),
-        'city'    => $order->get_shipping_city() ?: $order->get_billing_city(),
-        'zipCode' => $order->get_shipping_postcode() ?: $order->get_billing_postcode(),
-    );
+// Příjemce (ze shipping, fallback na billing)
+$recipient = array(
+    'name'     => trim( $order->get_shipping_first_name() . ' ' . $order->get_shipping_last_name() ),
+    'street'   => $order->get_shipping_address_1() ?: $order->get_billing_address_1(),
+    'address_2'=> $order->get_shipping_address_2() ?: $order->get_meta('shipping_address_2') ?: '',
+    'city'     => $order->get_shipping_city() ?: $order->get_billing_city(),
+    'zipCode'  => $order->get_shipping_postcode() ?: $order->get_billing_postcode(),
+);
 
     if ( empty( $recipient['name'] ) || empty( $recipient['street'] ) || empty( $recipient['city'] ) || empty( $recipient['zipCode'] ) ) {
         return new WP_Error( 'missing_recipient', 'Chybí některé povinné údaje příjemce' );
@@ -618,7 +619,7 @@ try {
     }
 
     try {
-        $template_path = WC_BALIKOVNA_PLUGIN_DIR . 'assets/template.pdf';
+        $template_path = WC_BALIKOVNA_PLUGIN_DIR . 'assets/BAL_stitek_HD_balikovna.pdf';
         if ( ! file_exists( $template_path ) ) {
             return new WP_Error( 'template_missing', 'Šablona PDF nebyla nalezena: assets/template.pdf' );
         }
@@ -658,20 +659,259 @@ try {
         $maxWidth = 85; // uprav dle šablony
 
         // --- Vykreslení polí (souřadnice uprav podle vaší šablony) ---
-        $pdf->SetXY( 12, 23 );
-        $pdf->MultiCell( $maxWidth, 5, wp_strip_all_tags( $data['sender']['name'] ), 0, 'L' );
-        $pdf->SetXY( 12, $pdf->GetY() + 2 );
-        $pdf->MultiCell( $maxWidth, 5, 'Objednávka č.: ' . wp_strip_all_tags( $data['sender']['order_number'] ), 0, 'L' );
+   // --- START: Výpis odesílatele — 4 řádky, co největším písmem do šířky $maxWidth ---
+$senderX = 12; // uprav X pozici podle potřeby (mm)
+$senderY = 17; // uprav Y pozici podle potřeby (mm)
 
-        $pdf->SetXY( 12, 45 );
-        $pdf->MultiCell( $maxWidth, 5, wp_strip_all_tags( $data['recipient']['name'] ), 0, 'L' );
-        $pdf->SetXY( 12, $pdf->GetY() + 2 );
-        $pdf->MultiCell( $maxWidth, 5, wp_strip_all_tags( $data['recipient']['street'] ), 0, 'L' );
-        $pdf->SetXY( 12, $pdf->GetY() + 2 );
-        $pdf->MultiCell( $maxWidth, 5, wp_strip_all_tags( $data['recipient']['city'] . ' ' . $data['recipient']['zipCode'] ), 0, 'L' );
+// První řádek: Obj. č. {číslo} z SU~PR sušené | pražené
+$order_number_display = '';
+if ( isset( $data['sender']['order_number'] ) && ! empty( $data['sender']['order_number'] ) ) {
+    $order_number_display = $data['sender']['order_number'];
+} elseif ( isset( $order ) && is_object( $order ) ) {
+    $order_number_display = $order->get_id();
+}
 
-        $pdf->SetXY( 12, $pdf->GetY() + 8 );
-        $pdf->MultiCell( $maxWidth, 5, 'Hmotnost zásilky: ' . $data['weight'] . ' kg', 0, 'L' );
+$sender_lines = array(
+    'Obj. č. ' . $order_number_display . ' z SU~PR sušené | pražené',
+    'Petrašovice 61',
+    'Bílá - Petrašovice',
+    '463 42',
+);
+
+// Font a počáteční velikost (mm jednotky používá TCPDF v bodech fontSize)
+$font_family = 'dejavusans';
+$font_style = '';
+$fontSize = 10; // počáteční velikost — bude snižována pokud se nevejde
+$minFontSize = 3; // minimální velikost které dovolíme
+$lineGap = 1; // mezera mezi řádky v mm (násobek fontSize použijeme níže)
+
+// Zajistíme, že GetStringWidth použije stejný font a velikost při měření
+// Pokud GetStringWidth nepodporuje čtvrtý parametr v tvé sestavě TCPDF, použij jen $pdf->GetStringWidth($text) a uprav logiku.
+$fits = false;
+while ( $fontSize >= $minFontSize ) {
+    $tooWide = false;
+    foreach ( $sender_lines as $line ) {
+        // GetStringWidth(text, font, style, fontsize) - vrací šířku v aktuálních jednotkách (mm)
+        $w = $pdf->GetStringWidth( $line, $font_family, $font_style, $fontSize );
+        if ( $w > $maxWidth ) {
+            $tooWide = true;
+            break;
+        }
+    }
+    if ( ! $tooWide ) {
+        $fits = true;
+        break;
+    }
+    $fontSize -= 1; // snižujeme o 1 pt dokud se to nevejde
+}
+
+// Pokud se nic nevejde i při minFontSize, ořízneme text (truncation) nebo zmenšíme ještě víc
+if ( ! $fits ) {
+    // fallback: použij minFontSize a případně zkrátit první řádek pokud je potřeba
+    $fontSize = $minFontSize;
+    // volitelně: můžeme zkrátit první řádek, aby se vešel
+    $first = $sender_lines[0];
+    while ( $pdf->GetStringWidth( $first, $font_family, $font_style, $fontSize ) > $maxWidth && mb_strlen($first) > 3 ) {
+        $first = mb_substr( $first, 0, mb_strlen($first) - 1 );
+    }
+    if ( mb_strlen($first) < mb_strlen($sender_lines[0]) ) {
+        $first = rtrim( $first ) . '…';
+        $sender_lines[0] = $first;
+    }
+}
+
+// Nastavíme font a vykreslíme řádky
+$pdf->SetFont( $font_family, $font_style, $fontSize );
+$pdf->SetTextColor( 0, 0, 0 );
+
+// spočítáme výšku jednoho řádku (přibližně)
+// TCPDF používá font size v bodech; přepočet na mm pro řádkování: použijeme jednoduchý faktor
+$lineHeight = max(  ( $fontSize * 0.35 ), 4 ); // 0.35 ~ převod na mm přijatelný, 4mm min výška řádku
+
+$curY = $senderY;
+foreach ( $sender_lines as $line ) {
+    $pdf->SetXY( $senderX, $curY );
+    // Použijeme Cell přesně do šířky $maxWidth a zarovnání vlevo
+    $pdf->Cell( $maxWidth, $lineHeight, $line, 0, 1, 'L', 0, '', 0 );
+    $curY += $lineHeight + $lineGap;
+}
+
+// Posuň kurzor pod tuto sekci, aby další obsah nezačínal přes odesílatele
+$pdf->SetY( $curY + 1 ); // 1 mm mezera navíc
+// --- END: Výpis odesílatele ---
+
+// --- START: Sekce "Adresát" (1: jméno TUČNĚ; 2: shipping_address_2 nebo branch; 3: ulice+č.p.; 4: PSČ + město TUČNĚ) ---
+$recipientX = 12;
+$recipientY = 45; // původní pozice
+
+// Primární zdroj dat z $data
+$recipient_name = !empty($data['recipient']['name']) ? wp_strip_all_tags($data['recipient']['name']) : '';
+$address1 = !empty($data['recipient']['street']) ? wp_strip_all_tags($data['recipient']['street']) : '';
+$address2 = !empty($data['recipient']['address_2']) ? wp_strip_all_tags($data['recipient']['address_2']) : '';
+$city = !empty($data['recipient']['city']) ? wp_strip_all_tags($data['recipient']['city']) : '';
+$zip  = !empty($data['recipient']['zipCode']) ? wp_strip_all_tags($data['recipient']['zipCode']) : '';
+
+// Fallbacky: pokud chybí některé údaje, zkusíme objednávku podle sender.order_number
+$branch_id = !empty($data['recipient']['branch_id']) ? wp_strip_all_tags($data['recipient']['branch_id']) : '';
+$branch_name = !empty($data['recipient']['branch_name']) ? wp_strip_all_tags($data['recipient']['branch_name']) : '';
+
+if ( empty($address2) || empty($address1) || empty($city) || empty($zip) || empty($recipient_name) || ( empty($branch_id) && empty($branch_name) ) ) {
+    $order_candidate = null;
+    if ( ! empty( $data['sender']['order_number'] ) ) {
+        $on = $data['sender']['order_number'];
+        if ( is_numeric( $on ) ) {
+            $order_candidate = wc_get_order( intval( $on ) );
+        } else {
+            // někdy prepare_label_data může vrátit order_number jako text — zkus nejdřív ID, pak order number
+            $order_candidate = wc_get_order( intval( $on ) );
+        }
+    }
+    if ( $order_candidate ) {
+        if ( empty($recipient_name) ) {
+            $recipient_name = trim( $order_candidate->get_shipping_first_name() . ' ' . $order_candidate->get_shipping_last_name() );
+            if ( empty($recipient_name) ) {
+                $recipient_name = trim( $order_candidate->get_billing_first_name() . ' ' . $order_candidate->get_billing_last_name() );
+            }
+        }
+        if ( empty($address1) ) {
+            $address1 = $order_candidate->get_shipping_address_1() ?: $order_candidate->get_billing_address_1();
+        }
+        if ( empty($address2) ) {
+            // TADY: konkrétně bereme shipping_address_2 z objednávky (pole, které jsi chtěl)
+            $address2 = $order_candidate->get_shipping_address_2() ?: $order_candidate->get_meta('shipping_address_2');
+        }
+        if ( empty($city) ) {
+            $city = $order_candidate->get_shipping_city() ?: $order_candidate->get_billing_city();
+        }
+        if ( empty($zip) ) {
+            $zip = $order_candidate->get_shipping_postcode() ?: $order_candidate->get_billing_postcode();
+        }
+        if ( empty($branch_id) ) {
+            $branch_id = $order_candidate->get_meta('_wc_balikovna_branch_id');
+        }
+        if ( empty($branch_name) ) {
+            $branch_name = $order_candidate->get_meta('_wc_balikovna_branch_name');
+        }
+    }
+}
+
+// Druhý řádek: preferuj address2 (shipping_address_2), pokud prázdné, použij branch_name nebo "Balíkovna"
+$line1 = $recipient_name;
+$line2 = '';
+if ( ! empty( $address2 ) ) {
+    $line2 = $address2;
+} else {
+    if ( ! empty( $branch_name ) ) {
+        $line2 = $branch_name;
+    } elseif ( ! empty( $branch_id ) ) {
+        $line2 = 'Balíkovna ID: ' . $branch_id;
+    } else {
+        // pokud opravdu nic není, nechte prázdné (nebude vykresleno)
+        $line2 = '';
+    }
+}
+$line3 = $address1;
+$line4 = trim( $zip . ' ' . $city );
+
+// Vytvoříme pole řádků (max 4), přeskočíme prázdné
+$recipient_lines = array();
+if ( $line1 !== '' ) $recipient_lines[] = $line1;
+if ( $line2 !== '' ) $recipient_lines[] = $line2;
+if ( $line3 !== '' ) $recipient_lines[] = $line3;
+if ( $line4 !== '' ) $recipient_lines[] = $line4;
+
+// Fonty / velikosti
+$font_family = 'dejavusans';
+$fontSizeBold = 12;
+$fontSizeNormal = 11;
+$minFontSize = 7;
+
+// Helper pro vykreslení jedné linky, vrací použité lineHeight v mm
+$drawLine = function( $text, $x, $y, $width, $fontFamily, $fontStyle, $fontSize ) use ( $pdf, $minFontSize ) {
+    $fs = $fontSize;
+    while ( $fs >= $minFontSize ) {
+        $w = $pdf->GetStringWidth( $text, $fontFamily, $fontStyle, $fs );
+        if ( $w <= $width ) break;
+        $fs -= 1;
+    }
+    if ( $fs < $minFontSize ) $fs = $minFontSize;
+    $pdf->SetFont( $fontFamily, $fontStyle, $fs );
+    $pdf->SetXY( $x, $y );
+    $pdf->Cell( $width, 0, $text, 0, 1, 'L', 0, '', 0 );
+    return max( ( $fs * 0.35 ), 4 );
+};
+
+// Vykreslíme řádky s požadovanými styly (1. tučně; 2. normálně; 3. normálně; 4. tučně)
+$curY = $recipientY;
+$totalLines = count( $recipient_lines );
+foreach ( $recipient_lines as $idx => $line ) {
+    // 1. řádek je vždy první (idx==0) -> bold
+    if ( $idx === 0 ) {
+        $lineHeight = $drawLine( $line, $recipientX, $curY, $maxWidth, $font_family, 'B', $fontSizeBold );
+    } elseif ( $idx === 3 ) {
+        // pokud máme skutečně 4 řádky, 4. má být tučný (PSČ + město)
+        $lineHeight = $drawLine( $line, $recipientX, $curY, $maxWidth, $font_family, 'B', $fontSizeBold );
+    } else {
+        // ostatní řádky normální
+        $lineHeight = $drawLine( $line, $recipientX, $curY, $maxWidth, $font_family, '', $fontSizeNormal );
+    }
+    $curY += $lineHeight + 1; // 1 mm gap
+}
+
+// Nastavíme kurzor pod adresátem
+$pdf->SetY( $curY + 1 );
+// --- END: Sekce "Adresát" ---
+
+// Vložíme piktogram a do něj vykreslíme hmotnost (formát x,yy bez jednotky)
+$img_path = WC_BALIKOVNA_PLUGIN_DIR . 'assets/18_hmotnost_hodnota_20_10.jpg';
+$x = 80;
+$y = $pdf->GetY() + 5;
+$img_w = 20; // šířka v mm (uprav dle potřeby)
+$img_h = 10; // výška v mm (uprav dle potřeby)
+
+// Formát hmotnosti pro zobrazení: 2 desetinná místa + čárka jako oddělovač
+$weight_display = is_numeric( $data['weight'] ) ? number_format( (float) $data['weight'], 2, ',', '' ) : $data['weight'];
+
+if ( file_exists( $img_path ) ) {
+    // Vložíme obrázek
+    $pdf->Image( $img_path, $x, $y, $img_w, $img_h, 'JPG' );
+
+    // Font pro text uvnitř obrázku
+    if ( method_exists( $pdf, 'SetFont' ) ) {
+        $pdf->SetFont( 'dejavusans', 'B', 9 );
+    } else {
+        $pdf->SetFont( 'Helvetica', 'B', 9 ); // fallback
+    }
+    $pdf->SetTextColor(0, 0, 0);
+
+    // Připravíme text (bez jednotky)
+    $text = $weight_display;
+
+    // Zjistíme šířku textu (metoda vrací šířku v aktuálních jednotkách)
+    $textWidth = $pdf->GetStringWidth( $text );
+
+    // Vypočítáme pozici pro centrovaný text uvnitř obrázku
+    $textX = $x + max(0, ($img_w - $textWidth) / 2);
+    $textY = $y + ($img_h / 2) - 2; // ladicí posun; uprav podle potřeby
+
+    // --- POSUN TEXTU DOPRAVA: uprav hodnotu $offset_right_mm (v mm) ---
+    $offset_right_mm = 3; // <--- změň na 0/1/2/... podle potřeby
+    $textX += $offset_right_mm;
+
+    // Vykreslíme text pomocí přesné X pozice (zarovnáno vlevo, protože jsme spočítali přesný X)
+    $pdf->SetXY( $textX, $textY );
+    $pdf->Cell( $textWidth, 0, $text, 0, 1, 'L', 0, '', 0 );
+
+    // Po vykreslení obrázku zajistíme, že další obsah nezačne přes něj
+    $pdf->SetY( $y + $img_h + 1 ); // 1 mm mezera pod obrázkem, uprav dle potřeby
+
+} else {
+    // Fallback: pokud obrázek chybí, vypíšeme jen číslo bez jednotky
+    $pdf->SetXY( 75, $pdf->GetY() + 10 );
+    $pdf->SetFont( 'dejavusans', '', 10 );
+    $pdf->MultiCell( $maxWidth, 5, $weight_display, 0, 'L' );
+    error_log( 'WC Balíkovna DEBUG: weight icon not found: ' . $img_path );
+}
 
         // Uložit do uploads
         $upload_dir = wp_upload_dir();
@@ -713,7 +953,7 @@ try {
         // The actual API endpoint and structure would need to be determined based on Czech Post documentation
         
         // Mock response for testing
-        $mock_label_url = WC_BALIKOVNA_PLUGIN_URL . 'assets/template.pdf';
+        $mock_label_url = WC_BALIKOVNA_PLUGIN_URL . 'assets/BAL_stitek_HD_balikovna.pdf';
         
         error_log('WC Balíkovna API: Mock response - returning success with URL: ' . $mock_label_url);
         
