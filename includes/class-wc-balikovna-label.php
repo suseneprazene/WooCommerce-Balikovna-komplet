@@ -530,6 +530,51 @@ jQuery(function($) {
             'city'     => $order->get_shipping_city() ?: $order->get_billing_city(),
             'zipCode'  => $order->get_shipping_postcode() ?: $order->get_billing_postcode(),
         );
+// AFTER you set $recipient (name/street/city/zip), přidej:
+$branch_id = $order->get_meta('_wc_balikovna_branch_id') ?: '';
+$branch_name = $order->get_meta('_wc_balikovna_branch_name') ?: '';
+$branch_type = $order->get_meta('_wc_balikovna_branch_type') ?: '';
+$branch_icon = $order->get_meta('_wc_balikovna_branch_icon') ?: '';
+
+// pokud icon chybí, pokusíme se ji zjistit z typu
+if ( empty( $branch_icon ) && ! empty( $branch_type ) ) {
+    $branch_icon = $this->get_piktogram_for_branch_type( $branch_type );
+}
+/**
+ * Resolve an asset filename to a real existing file path inside plugin (or common fallbacks).
+ *
+ * @param string $filename
+ * @return string empty if not found, otherwise full path to file
+ */
+private function get_asset_path( $filename ) {
+    if ( empty( $filename ) ) {
+        return '';
+    }
+    // Normalize filename (in case someone passed full path already)
+    $filename = ltrim( str_replace( '\\', '/', $filename ), '/' );
+
+    $candidates = array(
+        // primary plugin assets folder (preferred)
+        trailingslashit( WC_BALIKOVNA_PLUGIN_DIR ) . 'assets/' . $filename,
+        // fallback: plugin folder guessed by slug (in case constant differs)
+        WP_PLUGIN_DIR . '/woocommerce-balikovna-komplet/assets/' . $filename,
+        // relative fallback (same directory structure)
+        dirname( __FILE__ ) . '/../assets/' . $filename,
+    );
+
+    foreach ( $candidates as $p ) {
+        if ( file_exists( $p ) ) {
+            return $p;
+        }
+    }
+    return '';
+}
+
+// ulož do $recipient tak, aby build_pdf_from_template mohl použít
+if ( $branch_id )   $recipient['branch_id']   = $branch_id;
+if ( $branch_name ) $recipient['branch_name'] = $branch_name;
+if ( $branch_type ) $recipient['branch_type'] = $branch_type;
+if ( $branch_icon ) $recipient['branch_icon'] = $branch_icon;
 
         if ( empty( $recipient['name'] ) || empty( $recipient['street'] ) || empty( $recipient['city'] ) || empty( $recipient['zipCode'] ) ) {
             return new WP_Error( 'missing_recipient', 'Chybí některé povinné údaje příjemce' );
@@ -852,8 +897,35 @@ jQuery(function($) {
             // --- END: Sekce "Adresát" ---
 
             // Vložíme piktogram a do něj vykreslíme hmotnost (formát x,yy bez jednotky)
-            $img_path = WC_BALIKOVNA_PLUGIN_DIR . 'assets/18_hmotnost_hodnota_20_10.jpg';
-            $x = 80;
+if ( ! empty( $data['recipient']['branch_icon'] ) ) {
+// Vložíme piktogram a do něj vykreslíme hmotnost (formát x,yy bez jednotky)
+// Resolve icon file: branch_icon may be either a filename or a "type" key (e.g. 'box'|'balikovna')
+$img_path = '';
+if ( ! empty( $data['recipient']['branch_icon'] ) ) {
+    $candidate = $data['recipient']['branch_icon'];
+    // pokud kandidát neobsahuje tečku, považuj ho za typ a mapuj ho na název souboru
+    if ( strpos( $candidate, '.' ) === false ) {
+        $mapped = $this->get_piktogram_for_branch_type( $candidate );
+        $candidate_filename = $mapped ? $mapped : $candidate . '.jpg';
+    } else {
+        $candidate_filename = $candidate;
+    }
+    $img_path = $this->get_asset_path( $candidate_filename );
+}
+// pokud není nalezen žádný branch icon soubor, použij defaultní weight icon
+if ( empty( $img_path ) ) {
+    $img_path = $this->get_asset_path( '18_hmotnost_hodnota_20_10.jpg' );
+}
+if ( empty( $img_path ) ) {
+    // finální fallback: přímo z konstanty pluginu
+    $legacy = trailingslashit( WC_BALIKOVNA_PLUGIN_DIR ) . 'assets/18_hmotnost_hodnota_20_10.jpg';
+    if ( file_exists( $legacy ) ) {
+        $img_path = $legacy;
+    } else {
+        error_log( 'WC Balíkovna WARNING: piktogram not found for branch_icon: ' . ( $data['recipient']['branch_icon'] ?? 'none' ) );
+    }
+}
+$x = 80;
             $y = $pdf->GetY() + 5;
             $img_w = 20; // šířka v mm (uprav dle potřeby)
             $img_h = 10; // výška v mm (uprav dle potřeby)
@@ -971,6 +1043,123 @@ jQuery(function($) {
             return new WP_Error( 'pdf_error', 'Chyba při generování PDF: ' . $e->getMessage() );
         }
     }
+
+// --- START: Save selected branch into order meta + AJAX/session handler ---
+
+// 1) Přidej do __construct() (pokud tam ještě není) tyto hooky:
+// add_action('woocommerce_checkout_update_order_meta', array($this, 'save_branch_meta_on_checkout'), 10, 2);
+// add_action('wp_ajax_wc_balikovna_set_branch', array($this, 'ajax_set_branch'));
+// add_action('wp_ajax_nopriv_wc_balikovna_set_branch', array($this, 'ajax_set_branch'));
+
+ /**
+  * Uloží vybranou pobočku do meta objednávky při dokončení checkoutu.
+  *
+  * Očekává, že front-end pošle pole:
+  *  - wc_balikovna_branch_id
+  *  - wc_balikovna_branch_name
+  *  - wc_balikovna_branch_type (volitelně)
+  *
+  * Pokud typ není dodán, zkusíme ho dedukovat z XML feedu.
+  *
+  * @param int $order_id
+  * @param array $posted_data
+  */
+ public function save_branch_meta_on_checkout( $order_id, $posted_data ) {
+     if ( isset( $_POST['wc_balikovna_branch_id'] ) ) {
+         $branch_id = sanitize_text_field( wp_unslash( $_POST['wc_balikovna_branch_id'] ) );
+         update_post_meta( $order_id, '_wc_balikovna_branch_id', $branch_id );
+     } else {
+         $branch_id = '';
+     }
+
+     if ( isset( $_POST['wc_balikovna_branch_name'] ) ) {
+         $branch_name = sanitize_text_field( wp_unslash( $_POST['wc_balikovna_branch_name'] ) );
+         update_post_meta( $order_id, '_wc_balikovna_branch_name', $branch_name );
+     }
+
+     // pokud frontend poslal typ, uložíme ho; jinak se pokusíme detekovat z XML listu
+     $branch_type = '';
+     if ( isset( $_POST['wc_balikovna_branch_type'] ) && $_POST['wc_balikovna_branch_type'] !== '' ) {
+         $branch_type = sanitize_text_field( wp_unslash( $_POST['wc_balikovna_branch_type'] ) );
+         update_post_meta( $order_id, '_wc_balikovna_branch_type', $branch_type );
+     } elseif ( ! empty( $branch_id ) ) {
+         // pokusíme se detekovat typ z XML feedu pomocí helperů (pokud nejsou v session)
+         $xml = $this->fetch_branches_xml();
+         if ( ! is_wp_error( $xml ) ) {
+             $node = $this->find_branch_node_by_id( $xml, $branch_id );
+             if ( $node ) {
+                 $branch_type = $this->detect_branch_type_from_node( $node );
+                 if ( $branch_type ) {
+                     update_post_meta( $order_id, '_wc_balikovna_branch_type', $branch_type );
+                     $icon = $this->get_piktogram_for_branch_type( $branch_type );
+                     if ( $icon ) {
+                         update_post_meta( $order_id, '_wc_balikovna_branch_icon', $icon );
+                     }
+                 }
+             }
+         }
+     }
+
+     // pokud uživatel jen vybral pobočku v session (AJAX), můžeme mít uložená data v session - při checkoutu použijeme i to
+     if ( empty( $branch_id ) && WC()->session ) {
+         $sess = WC()->session->get( 'wc_balikovna_branch', array() );
+         if ( ! empty( $sess['id'] ) ) {
+             update_post_meta( $order_id, '_wc_balikovna_branch_id', sanitize_text_field( $sess['id'] ) );
+         }
+         if ( ! empty( $sess['name'] ) ) {
+             update_post_meta( $order_id, '_wc_balikovna_branch_name', sanitize_text_field( $sess['name'] ) );
+         }
+         if ( ! empty( $sess['type'] ) ) {
+             update_post_meta( $order_id, '_wc_balikovna_branch_type', sanitize_text_field( $sess['type'] ) );
+         }
+     }
+ }
+
+ /**
+  * AJAX handler pro uložení vybrané pobočky do uživatelské session (checkout).
+  * Front‑end zavolá tento endpoint při výběru pobočky.
+  *
+  * POST parameters:
+  *  - branch_id
+  *  - branch_name
+  *  - branch_type (volitelně)
+  *  - nonce (optional, pokud chcete ověření)
+  */
+ public function ajax_set_branch() {
+     // volitelně ověření nonce (pokud posíláte)
+     if ( isset( $_POST['nonce'] ) && ! empty( $_POST['nonce'] ) ) {
+         // wp_verify_nonce kontrola zde pokud používáte nonce
+         // if ( ! wp_verify_nonce( sanitize_text_field($_POST['nonce']), 'wc_balikovna_set_branch_nonce' ) ) {
+         //     wp_send_json_error( array( 'message' => 'Neplatný nonce' ) );
+         // }
+     }
+
+     if ( ! WC()->session ) {
+         wp_send_json_error( array( 'message' => 'Session not available' ) );
+     }
+
+     $branch = array(
+         'id'   => isset( $_POST['branch_id'] ) ? sanitize_text_field( wp_unslash( $_POST['branch_id'] ) ) : '',
+         'name' => isset( $_POST['branch_name'] ) ? sanitize_text_field( wp_unslash( $_POST['branch_name'] ) ) : '',
+         'type' => isset( $_POST['branch_type'] ) ? sanitize_text_field( wp_unslash( $_POST['branch_type'] ) ) : '',
+     );
+
+     // pokud typ není předán, pokusíme se ho doplnit z XML (pokud máme id)
+     if ( empty( $branch['type'] ) && ! empty( $branch['id'] ) ) {
+         $xml = $this->fetch_branches_xml();
+         if ( ! is_wp_error( $xml ) ) {
+             $node = $this->find_branch_node_by_id( $xml, $branch['id'] );
+             if ( $node ) {
+                 $branch['type'] = $this->detect_branch_type_from_node( $node );
+             }
+         }
+     }
+
+     WC()->session->set( 'wc_balikovna_branch', $branch );
+     wp_send_json_success( array( 'saved' => true, 'branch' => $branch ) );
+ }
+
+// --- END: Save selected branch into order meta + AJAX/session handler ---
 
     /**
      * Call API endpoint
