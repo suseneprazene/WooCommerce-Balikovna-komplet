@@ -862,29 +862,6 @@ if ( $branch_icon ) $recipient['branch_icon'] = $branch_icon;
         $weight_kg = $this->calculate_order_weight( $order );
 
 
-// --- START: robustní určení deliveryType (nejdřív z order meta, fallback na nastavení instance dopravy) ---
-$delivery_type = $order->get_meta('_wc_balikovna_delivery_type');
-
-if ( empty( $delivery_type ) ) {
-    // Prohlédneme shipping položky objednávky a najdeme balikovna instance_id
-    $shipping_items = $order->get_items('shipping');
-    foreach ( $shipping_items as $ship_item ) {
-        // objekt WC_Order_Item_Shipping
-        $method_id   = method_exists( $ship_item, 'get_method_id' ) ? $ship_item->get_method_id() : ( $ship_item['method_id'] ?? '' );
-        $instance_id = method_exists( $ship_item, 'get_instance_id' ) ? $ship_item->get_instance_id() : ( $ship_item['instance_id'] ?? '' );
-
-        if ( $method_id === 'balikovna' && ! empty( $instance_id ) ) {
-            // vytvoříme instanci shipping method pro dané instance_id a přečteme option
-            if ( class_exists( 'WC_Balikovna_Shipping_Method' ) ) {
-                try {
-                    $method_instance = new \WC_Balikovna_Shipping_Method( $instance_id );
-                    $delivery_type = $method_instance->get_option( 'delivery_type', 'box' );
-                } catch ( Exception $e ) {
-                    // ignore - fallback níže
-                }
-            }
-            if ( ! empty( $delivery_type ) ) {
-
 // --- START: robustní určení deliveryType (nahraď původní blok) ---
 $delivery_type = $order->get_meta('_wc_balikovna_delivery_type');
 
@@ -957,38 +934,18 @@ if ( empty( $delivery_type ) ) {
 if ( empty( $delivery_type ) ) {
     $delivery_type = 'box';
 
-// poslední fallback: 'box'
-if ( empty( $delivery_type ) ) {
-    $delivery_type = 'box';
-    error_log( 'prepare_label_data - delivery_type fallback to box for order #' . $order->get_id() );
-
 }
 // --- END: robustní určení deliveryType ---
-
 return array(
     'sender'       => $sender,
     'recipient'    => $recipient,
     'weight'       => $weight_kg,
     'deliveryType' => $delivery_type,
-);}
-    } 
-
-
-    /**
-     * Vytvoří PDF štítek z template (FPDI + TCPDF nebo FPDI+FPDF fallback).
-     *
-     * @param array $data Výstup z prepare_label_data()
-     * @return array|WP_Error ['success'=>true,'url'=>'...'] nebo WP_Error
-     */
-
-
-	 /**
+);
+} // <-- Tato závorka musí být, aby jsi ukončil funkci prepare_label_data!
 
 /**
- * Vrátí layout/positioning nastavení pro danou šablonu (klíč 'box' nebo 'address' apod.)
- *
- * @param string $template_key normalized deliveryType (např. 'box' nebo 'address')
- * @return array Associative array of layout settings (mm, font sizes, offsets...)
+ * Vrátí layout/positioning ...
  */
 private function get_template_layout_settings( $template_key ) {
     // default settings (bezpečný fallback)
