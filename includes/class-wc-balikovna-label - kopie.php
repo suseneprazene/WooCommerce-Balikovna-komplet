@@ -724,53 +724,22 @@ private function build_pdf_from_template( $data ) {
     }
 
     try {
-// --- DEBUG LOGGER: ukládá do složky pluginu /logs/debug.log ---
-$plugin_dir = defined('WC_BALIKOVNA_PLUGIN_DIR') ? WC_BALIKOVNA_PLUGIN_DIR : plugin_dir_path( __FILE__ );
-$log_dir = trailingslashit( $plugin_dir ) . 'logs';
-if ( ! file_exists( $log_dir ) ) {
-    @wp_mkdir_p( $log_dir );
-}
-$log_file = trailingslashit( $log_dir ) . 'debug.log';
-$log = function( $message ) use ( $log_file ) {
-    $time = date( 'Y-m-d H:i:s' );
-    @file_put_contents( $log_file, "[$time] " . $message . PHP_EOL, FILE_APPEND | LOCK_EX );
-};
+        // Vybereme šablonu podle delivery type (default = box)
+        $template_name = 'BAL_stitek_HD_balikovna.pdf'; // default pro box
+        if ( isset( $data['deliveryType'] ) && $data['deliveryType'] === 'address' ) {
+            $template_name = 'HAS_Balikovna_plus_cistopis_podavatele.pdf';
+        }
 
-// Log raw incoming deliveryType
-$rawDelivery = isset( $data['deliveryType'] ) ? $data['deliveryType'] : 'NULL';
-$log( 'build_pdf_from_template - raw deliveryType: ' . var_export( $rawDelivery, true ) );
+        $template_path = WC_BALIKOVNA_PLUGIN_DIR . 'assets/' . $template_name;
+        if ( ! file_exists( $template_path ) ) {
+            $fallback = WC_BALIKOVNA_PLUGIN_DIR . 'assets/BAL_stitek_HD_balikovna.pdf';
+            if ( file_exists( $fallback ) ) {
+                $template_path = $fallback;
+            } else {
+                return new WP_Error( 'template_missing', 'Šablona PDF nebyla nalezena: ' . $template_name );
+            }
+        }
 
-// Normalizace hodnoty (trim + lowercase)
-$deliveryTypeNormalized = is_string( $rawDelivery ) ? strtolower( trim( $rawDelivery ) ) : '';
-if ( $deliveryTypeNormalized === '' ) {
-    $deliveryTypeNormalized = 'box';
-}
-$log( 'build_pdf_from_template - normalized deliveryType: ' . $deliveryTypeNormalized );
-
-// Vybereme šablonu podle delivery type (default = box)
-$template_name = 'BAL_stitek_HD_balikovna.pdf'; // default pro box
-if ( $deliveryTypeNormalized === 'address' ) {
-    $template_name = 'HAS_Balikovna_plus_cistopis_podavatele.pdf';
-    $log( 'build_pdf_from_template - selected address template: ' . $template_name );
-} else {
-    $log( 'build_pdf_from_template - selected box/default template: ' . $template_name );
-}
-
-// sestavíme cestu k souboru a zkontrolujeme existenci (fallback na default)
-$template_path = trailingslashit( $plugin_dir ) . 'assets/' . $template_name;
-if ( ! file_exists( $template_path ) ) {
-    $log( 'build_pdf_from_template - template not found: ' . $template_path . ' — trying fallback.' );
-    $fallback = trailingslashit( $plugin_dir ) . 'assets/BAL_stitek_HD_balikovna.pdf';
-    if ( file_exists( $fallback ) ) {
-        $template_path = $fallback;
-        $log( 'build_pdf_from_template - using fallback template: ' . $template_path );
-    } else {
-        $log( 'build_pdf_from_template - ERROR: no template found (tried ' . $template_name . ' and fallback).' );
-        return new WP_Error( 'template_missing', 'Šablona PDF nebyla nalezena: ' . $template_name );
-    }
-} else {
-    $log( 'build_pdf_from_template - template file exists: ' . $template_path );
-}
         // Instantiate appropriate FPDI class
         if ( class_exists( '\setasign\Fpdi\Tcpdf\Fpdi' ) ) {
             $pdf = new \setasign\Fpdi\Tcpdf\Fpdi();
@@ -967,73 +936,40 @@ foreach ( $recipient_lines as $idx => $line ) {
 // Nastavíme kurzor pod adresátem
 $pdf->SetY( $curY + 1 );
 
-// --- Ikony (zarovnání podle začátku adresy a doladění hmotnosti) ---
-// Používáme $recipientX a $recipientY (adresát) jako referenci pro vertikální zarovnání.
-$icons_reference_y = isset($recipientY) ? $recipientY : $pdf->GetY(); // pokud není recipientY, fallback
-// Parametry ladění (mm) - uprav podle výsledku
-$leftX = 12; // X pozice piktogramu vzhledem k levému okraji (můžeš upravit)
-$leftY = 120;   // doleva/nahoru doladění pro levý piktogram (doplň; kladné posouvá dolů)
-$weight_vertical_adjust_mm = 5.0; // kolik mm posunout hmotnost dolů oproti adresní lince (zvýšit = více dolů)
-$weight_text_vertical_extra = 2.0; // další jemné doladění pro text uvnitř hmotnostního piktogramu
+// --- Ikony (nastav Y podle šablony) ---
+$iconsY_mm = $pdf->GetY() + 5; // malé odsazení pod adresátem, uprav podle potřeby
 
-// Levý piktogram - očekávané jméno; kód zkusí tolerantní varianty
-$left_candidate = '04_balikovna na adresu_10_10.jpg';
-$left_img_path = $this->get_asset_path( $left_candidate );
-if ( empty( $left_img_path ) ) {
-    $alt = str_replace( ' ', '_', $left_candidate );
-    $left_img_path = $this->get_asset_path( $alt );
-}
-// další tolerantní hledání
-if ( empty( $left_img_path ) ) {
-    $assets = glob( trailingslashit( WC_BALIKOVNA_PLUGIN_DIR ) . 'assets/*.{jpg,png}', GLOB_BRACE );
-    $wanted_norm = strtolower( preg_replace( '/[^a-z0-9]+/i', '', pathinfo( $left_candidate, PATHINFO_FILENAME ) ) );
-    foreach ( (array) $assets as $f ) {
-        $bn = pathinfo( $f, PATHINFO_FILENAME );
-        if ( strtolower( preg_replace( '/[^a-z0-9]+/i', '', $bn ) ) === $wanted_norm ) {
-            $left_img_path = $f;
-            break;
-        }
+$left_img_path  = '';
+$right_img_path = '';
+
+if ( ! empty( $data['recipient']['branch_icon'] ) ) {
+    $candidate = $data['recipient']['branch_icon'];
+    if ( strpos( $candidate, '.' ) === false ) {
+        $mapped = $this->get_piktogram_for_branch_type( $candidate );
+        $candidate_filename = $mapped ? $mapped : $candidate . '.jpg';
+    } else {
+        $candidate_filename = $candidate;
     }
+    $left_img_path = $this->get_asset_path( $candidate_filename );
 }
 
-// Pravý (hmotnost) piktogram - původní název
 $right_img_path = $this->get_asset_path( '18_hmotnost_hodnota_20_10.jpg' );
 if ( empty( $right_img_path ) ) {
     $legacy = trailingslashit( WC_BALIKOVNA_PLUGIN_DIR ) . 'assets/18_hmotnost_hodnota_20_10.jpg';
-    if ( file_exists( $legacy ) ) $right_img_path = $legacy;
+    if ( file_exists( $legacy ) ) {
+        $right_img_path = $legacy;
+    }
 }
 
-// Rozměry (mm) - doladíš podle výsledku
-$leftW  = 10; $leftH  = 10;
-$rightW = 20; $rightH = 10;
-
-// --- Ikony: posun obou ikon níž + posun textu hmotnosti doprava ---
-// reference jako dřív
-$iconsY_mm = $pdf->GetY() + 5;
-
-// rozměry (nezměněno)
-$leftW  = 10; $leftH  = 10;
-$rightW = 20; $rightH = 10;
-
-// výchozí X souřadnice (ponech stejné jako u box verze)
 $leftX  = 12;
-$rightX = 70;
+$leftY  = $iconsY_mm;
+$leftW  = 10;
+$leftH  = 10;
 
-// VŠEOBECNÝ VERTIKÁLNÍ POSUN (změň jen toto číslo pro obě ikony)
-$vertical_shift_mm = 5.5; // zvýšit = ikony více dolů, snížit = nahoru
-
-// pevné Y pozice (posunuté dolů)
-$leftY  = $iconsY_mm + $vertical_shift_mm;
-$rightY = $iconsY_mm + $vertical_shift_mm;
-
-// POSUN TEXTU HMOTNOSTI (vodorovně / svisle)
-$weight_text_horizontal_shift = 4.0; // pozitivní = posun doprava (nastavit podle potřeby)
-$weight_text_vertical_extra   = 2.0; // již používané drobné doladění (ponechat/ladit)
-
-
-
-// Vykreslíme levou ikonu
-
+$rightW = 20;
+$rightH = 10;
+$rightX = 80;
+$rightY = $iconsY_mm;
 
 if ( ! empty( $left_img_path ) && file_exists( $left_img_path ) ) {
     try {
@@ -1041,11 +977,7 @@ if ( ! empty( $left_img_path ) && file_exists( $left_img_path ) ) {
     } catch ( Exception $e ) {
         error_log( 'WC Balíkovna DEBUG: left icon render failed: ' . $e->getMessage() );
     }
-} else {
-    error_log( 'WC Balíkovna DEBUG: left icon not found: ' . $left_candidate );
 }
-
-// Vykreslíme pravou ikonu (grafika pro hmotnost)
 
 $drawWeightInside = false;
 if ( ! empty( $right_img_path ) && file_exists( $right_img_path ) ) {
@@ -1056,56 +988,28 @@ if ( ! empty( $right_img_path ) && file_exists( $right_img_path ) ) {
         error_log( 'WC Balíkovna DEBUG: right icon render failed: ' . $e->getMessage() );
         $drawWeightInside = false;
     }
-} else {
-    error_log( 'WC Balíkovna DEBUG: weight icon not found: ' . $right_img_path );
-    $drawWeightInside = false;
 }
 
-// Vykreslení textu hmotnosti uvnitř pravého piktogramu (robustní centrování + posun + clamping)
+// Vykreslení textu hmotnosti do pravého piktogramu (pokud máme)
 if ( $drawWeightInside && isset( $data['weight'] ) && $data['weight'] !== '' ) {
     $font_family = ( method_exists( $pdf, 'SetFont' ) ? 'dejavusans' : 'Helvetica' );
     $font_size   = 9;
     $text = (string) $data['weight'];
-
     $textWidth = $pdf->GetStringWidth( $text, $font_family, '', $font_size );
 
-    // základní centrování uvnitř piktogramu
-    $baseX = $rightX + max( 0, ( $rightW - $textWidth ) / 2 );
-
-    // horizontální posun (volitelný)
-    $shift = isset( $weight_text_horizontal_shift ) ? floatval( $weight_text_horizontal_shift ) : 0.0;
-
-    // výsledné X s posunem
-    $textX = $baseX + $shift;
-
-    // clamping: zajistit, aby text nezačínal vlevo od piktogramu ani nepřetekl vpravo
-    $minTextX = $rightX;
-    $maxTextX = $rightX + $rightW - $textWidth;
-
-    if ( $textWidth > $rightW ) {
-        // text je širší než piktogram -> zarovnat vlevo uvnitř piktogramu
-        $textX = $rightX;
-    } else {
-        if ( $textX < $minTextX ) {
-            $textX = $minTextX;
-        }
-        if ( $textX > $maxTextX ) {
-            $textX = $maxTextX;
-        }
-    }
-
-    $textY = $rightY + ( $rightH / 2 ) - ( $font_size * 0.35 ) + ( isset( $weight_text_vertical_extra ) ? floatval( $weight_text_vertical_extra ) : 0.0 );
+    $textX = $rightX + max( 0, ( $rightW - $textWidth ) / 2 );
+    $vertical_adjust = 1.5;
+    $textY = $rightY + ( $rightH / 2 ) - ( $font_size * 0.35 ) + $vertical_adjust;
 
     $pdf->SetFont( $font_family, '', $font_size );
     $pdf->SetTextColor( 0, 0, 0 );
     $pdf->SetXY( $textX, $textY );
-    $pdf->Cell( $textWidth, 0, $text, 0, 1, 'L', 0, '', 0 );
+    $pdf->Cell( $textWidth, 0, $text, 0, 1, 'C', 0, '', 0 );
 }
 
-// Posun kurzoru pod ikony, aby další obsah nezačínal přes ně
+// Posun kurzoru pod ikony
 $afterIconsY = max( $leftY + $leftH, $rightY + $rightH );
 $pdf->SetY( $afterIconsY + 2 );
-// --- konec ikon ---
 
 // Uložit do uploads
 $upload_dir = wp_upload_dir();
@@ -1125,7 +1029,115 @@ return array( 'success' => true, 'url' => $url );
     return new WP_Error( 'pdf_error', 'Chyba při generování PDF: ' . $e->getMessage() );
 }
 }
+ /**
+  * Uloží vybranou pobočku do meta objednávky při dokončení checkoutu.
+  *
+  * Očekává, že front-end pošle pole:
+  *  - wc_balikovna_branch_id
+  *  - wc_balikovna_branch_name
+  *  - wc_balikovna_branch_type (volitelně)
+  *
+  * Pokud typ není dodán, zkusíme ho dedukovat z XML feedu.
+  *
+  * @param int $order_id
+  * @param array $posted_data
+  */
+ public function save_branch_meta_on_checkout( $order_id, $posted_data ) {
+     if ( isset( $_POST['wc_balikovna_branch_id'] ) ) {
+         $branch_id = sanitize_text_field( wp_unslash( $_POST['wc_balikovna_branch_id'] ) );
+         update_post_meta( $order_id, '_wc_balikovna_branch_id', $branch_id );
+     } else {
+         $branch_id = '';
+     }
 
+     if ( isset( $_POST['wc_balikovna_branch_name'] ) ) {
+         $branch_name = sanitize_text_field( wp_unslash( $_POST['wc_balikovna_branch_name'] ) );
+         update_post_meta( $order_id, '_wc_balikovna_branch_name', $branch_name );
+     }
+
+     // pokud frontend poslal typ, uložíme ho; jinak se pokusíme detekovat z XML listu
+     $branch_type = '';
+     if ( isset( $_POST['wc_balikovna_branch_type'] ) && $_POST['wc_balikovna_branch_type'] !== '' ) {
+         $branch_type = sanitize_text_field( wp_unslash( $_POST['wc_balikovna_branch_type'] ) );
+         update_post_meta( $order_id, '_wc_balikovna_branch_type', $branch_type );
+     } elseif ( ! empty( $branch_id ) ) {
+         // pokusíme se detekovat typ z XML feedu pomocí helperů (pokud nejsou v session)
+         $xml = $this->fetch_branches_xml();
+         if ( ! is_wp_error( $xml ) ) {
+             $node = $this->find_branch_node_by_id( $xml, $branch_id );
+             if ( $node ) {
+                 $branch_type = $this->detect_branch_type_from_node( $node );
+                 if ( $branch_type ) {
+                     update_post_meta( $order_id, '_wc_balikovna_branch_type', $branch_type );
+                     $icon = $this->get_piktogram_for_branch_type( $branch_type );
+                     if ( $icon ) {
+                         update_post_meta( $order_id, '_wc_balikovna_branch_icon', $icon );
+                     }
+                 }
+             }
+         }
+     }
+
+     // pokud uživatel jen vybral pobočku v session (AJAX), můžeme mít uložená data v session - při checkoutu použijeme i to
+     if ( empty( $branch_id ) && WC()->session ) {
+         $sess = WC()->session->get( 'wc_balikovna_branch', array() );
+         if ( ! empty( $sess['id'] ) ) {
+             update_post_meta( $order_id, '_wc_balikovna_branch_id', sanitize_text_field( $sess['id'] ) );
+         }
+         if ( ! empty( $sess['name'] ) ) {
+             update_post_meta( $order_id, '_wc_balikovna_branch_name', sanitize_text_field( $sess['name'] ) );
+         }
+         if ( ! empty( $sess['type'] ) ) {
+             update_post_meta( $order_id, '_wc_balikovna_branch_type', sanitize_text_field( $sess['type'] ) );
+         }
+     }
+ }
+
+ /**
+  * AJAX handler pro uložení vybrané pobočky do uživatelské session (checkout).
+  * Front‑end zavolá tento endpoint při výběru pobočky.
+  *
+  * POST parameters:
+  *  - branch_id
+  *  - branch_name
+  *  - branch_type (volitelně)
+  *  - nonce (optional, pokud chcete ověření)
+  */
+ public function ajax_set_branch() {
+     // volitelně ověření nonce (pokud posíláte)
+     if ( isset( $_POST['nonce'] ) && ! empty( $_POST['nonce'] ) ) {
+         // wp_verify_nonce kontrola zde pokud používáte nonce
+         // if ( ! wp_verify_nonce( sanitize_text_field($_POST['nonce']), 'wc_balikovna_set_branch_nonce' ) ) {
+         //     wp_send_json_error( array( 'message' => 'Neplatný nonce' ) );
+         // }
+     }
+
+     if ( ! WC()->session ) {
+         wp_send_json_error( array( 'message' => 'Session not available' ) );
+     }
+
+     $branch = array(
+         'id'   => isset( $_POST['branch_id'] ) ? sanitize_text_field( wp_unslash( $_POST['branch_id'] ) ) : '',
+         'name' => isset( $_POST['branch_name'] ) ? sanitize_text_field( wp_unslash( $_POST['branch_name'] ) ) : '',
+         'type' => isset( $_POST['branch_type'] ) ? sanitize_text_field( wp_unslash( $_POST['branch_type'] ) ) : '',
+     );
+
+     // pokud typ není předán, pokusíme se ho doplnit z XML (pokud máme id)
+     if ( empty( $branch['type'] ) && ! empty( $branch['id'] ) ) {
+         $xml = $this->fetch_branches_xml();
+         if ( ! is_wp_error( $xml ) ) {
+             $node = $this->find_branch_node_by_id( $xml, $branch['id'] );
+             if ( $node ) {
+                 $branch['type'] = $this->detect_branch_type_from_node( $node );
+             }
+         }
+     }
+
+     WC()->session->set( 'wc_balikovna_branch', $branch );
+     wp_send_json_success( array( 'saved' => true, 'branch' => $branch ) );
+ }
+
+// --- END: Save selected branch into order meta + AJAX/session handler ---
 
 /**
  * Resolve an asset filename to a real existing file path inside plugin (or common fallbacks).

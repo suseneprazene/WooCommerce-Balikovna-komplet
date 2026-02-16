@@ -235,6 +235,30 @@ $('.wc-balikovna-branches').on('select2:select', function (e) {
         // Aplikujeme hodnoty lokálně do polí (zobrazí se uživateli)
         WCBalikovnaCheckout.applyBranchToFields(branchData);
 
+var ajaxEndpoint = (typeof wcBalikovnaData !== 'undefined' && wcBalikovnaData.ajaxUrl) ? wcBalikovnaData.ajaxUrl : (typeof ajaxurl !== 'undefined' ? ajaxurl : '/wp-admin/admin-ajax.php');
+
+var ajaxPayload = {
+    action: 'wc_balikovna_set_branch',
+    branch_id: branchData.id || '',
+    branch_name: branchData.name || '',
+    branch_type: branchData.kind || branchData.type || '', // pokud máte kind/type
+};
+
+// pokud máte nonce v globalu, pošlete ho (volitelné)
+if (typeof wcBalikovnaData !== 'undefined' && wcBalikovnaData.ajaxNonce) {
+    ajaxPayload.nonce = wcBalikovnaData.ajaxNonce;
+}
+
+$.post(ajaxEndpoint, ajaxPayload, function(resp) {
+    if (resp && resp.success) {
+        console.log('WC Balíkovna: branch saved to session via AJAX', resp.data);
+    } else {
+        console.warn('WC Balíkovna: unable to save branch to session', resp);
+    }
+}, 'json').fail(function(jqXHR, textStatus, error) {
+    console.error('WC Balíkovna: AJAX error saving branch', textStatus, error);
+});
+
         // Zavoláme update_checkout — reapplyOnUpdate zaručí, že po přegenerování znovu aplikujeme hodnoty
         $(document.body).trigger('update_checkout');
 
@@ -248,6 +272,11 @@ $('.wc-balikovna-branches').on('select2:unselect', function () {
     if ($('#wc_balikovna_branch').length) {
         $('#wc_balikovna_branch').val('');
     }
+	var clearPayload = { action: 'wc_balikovna_set_branch', branch_id: '', branch_name: '', branch_type: '' };
+if (typeof wcBalikovnaData !== 'undefined' && wcBalikovnaData.ajaxNonce) clearPayload.nonce = wcBalikovnaData.ajaxNonce;
+$.post( (typeof wcBalikovnaData !== 'undefined' && wcBalikovnaData.ajaxUrl) ? wcBalikovnaData.ajaxUrl : ajaxurl, clearPayload, function(resp){
+    console.log('WC Balíkovna: cleared branch session', resp);
+}, 'json');
     // volitelně: odstranit branch note
     // $('#wc_balikovna_branch_note').remove();
     // $(document.body).trigger('update_checkout');
