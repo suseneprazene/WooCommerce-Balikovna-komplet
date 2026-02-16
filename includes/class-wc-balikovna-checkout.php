@@ -357,54 +357,39 @@ public function save_checkout_data($order_id)
         $bn = mb_strtolower( trim( $name_raw ), 'UTF-8' );
 
         // klíčová slova, rozšiř podle potřeby
-        $box_keywords = array( 'box', 'alza', 'alzabox', 'alza box', 'ox point', 'oxpoint', 'locker', 'pick', 'pickup', 'parcel locker', 'packstation' );
-        $post_keywords = array( 'posta', 'pošta', 'depo', 'post' );
+$box_keywords = array(
+    'box', 'balikovna box', 'alza', 'alzabox', 'alza box', 'ox point', 'oxpoint', 'locker', 
+    'pick', 'pickup', 'parcel locker', 'packstation', 'balikbox', 'z-box', 'ulozenka', 'parcelshop'
+);
+$post_keywords = array('posta', 'pošta', 'depo', 'post');
 
-        // detekce: preferuj explicitní kind, fallback na name
-        $branch_type = 'balikovna'; // default
-        if ( $lk !== '' ) {
-            foreach ( $box_keywords as $k ) {
-                if ( strpos( $lk, $k ) !== false ) {
-                    $branch_type = 'box';
-                    break;
-                }
-            }
-            if ( $branch_type === 'balikovna' ) {
-                foreach ( $post_keywords as $k ) {
-                    if ( strpos( $lk, $k ) !== false ) {
-                        $branch_type = 'post';
-                        break;
-                    }
-                }
-            }
-        } elseif ( $bn !== '' ) {
-            // fallback: hledej ve jménu pobočky
-            foreach ( $box_keywords as $k ) {
-                if ( strpos( $bn, $k ) !== false ) {
-                    $branch_type = 'box';
-                    break;
-                }
-            }
-            if ( $branch_type === 'balikovna' ) {
-                foreach ( $post_keywords as $k ) {
-                    if ( strpos( $bn, $k ) !== false ) {
-                        $branch_type = 'post';
-                        break;
-                    }
-                }
-            }
+$branch_type = 'balikovna'; // default
+$lk = mb_strtolower(trim($kind_raw), 'UTF-8');
+$bn = mb_strtolower(trim($name_raw), 'UTF-8');
+
+foreach ($box_keywords as $k) {
+    if (strpos($lk, $k) !== false || strpos($bn, $k) !== false) {
+        $branch_type = 'box';
+        break;
+    }
+}
+if ($branch_type === 'balikovna') {
+    foreach ($post_keywords as $k) {
+        if (strpos($lk, $k) !== false || strpos($bn, $k) !== false) {
+            $branch_type = 'post';
+            break;
         }
+    }
+}
+$order->update_meta_data('_wc_balikovna_branch_type', $branch_type);
 
-        $order->update_meta_data( '_wc_balikovna_branch_type', $branch_type );
-
-        // mapování typ -> filename piktogramu (upravit názvy souborů podle assets)
-        $icon_map = array(
-            'balikovna' => '05_ukladana_zasilka_10_10.jpg',
-            'box'       => '07_BOX_10_10.jpg',
-            'post'      => '05_ukladana_zasilka_10_10.jpg',
-        );
-        $branch_icon_filename = isset( $icon_map[ $branch_type ] ) ? $icon_map[ $branch_type ] : '18_hmotnost_hodnota_20_10.jpg';
-        $order->update_meta_data( '_wc_balikovna_branch_icon', $branch_icon_filename );
+$icon_map = array(
+    'balikovna' => '05_ukladana_zasilka_10_10.jpg',
+    'box'       => '07_BOX_10_10.jpg',
+    'post'      => '05_ukladana_zasilka_10_10.jpg',
+);
+$branch_icon_filename = isset($icon_map[$branch_type]) ? $icon_map[$branch_type] : '18_hmotnost_hodnota_20_10.jpg';
+$order->update_meta_data('_wc_balikovna_branch_icon', $branch_icon_filename);
 
         // Pokud je doručení do boxu, přepiš shipping políčka v objednávce (jak bylo dříve)
         if ( $delivery_type === 'box' ) {
