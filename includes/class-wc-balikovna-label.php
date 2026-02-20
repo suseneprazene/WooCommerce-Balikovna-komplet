@@ -440,19 +440,73 @@ private function balikovna_debug_log($message) {
         // --- TEMP DEBUG: dump order meta + shipping items for diagnostics ---
 public function generate_label($order)
 {
-error_log( 'DEBUG: order #' . $order->get_id() . ' _wc_balikovna_delivery_type=' . var_export( $order->get_meta('_wc_balikovna_delivery_type'), true ) );
-foreach ( $order->get_items( 'shipping' ) as $si_debug ) {
-    $mi_method   = method_exists( $si_debug, 'get_method_id' )   ? $si_debug->get_method_id()   : ( $si_debug['method_id']   ?? '' );
-    $mi_instance = method_exists( $si_debug, 'get_instance_id' ) ? $si_debug->get_instance_id() : ( $si_debug['instance_id'] ?? '' );
-    $mi_title    = method_exists( $si_debug, 'get_method_title' )? $si_debug->get_method_title(): ( $si_debug['method_title'] ?? '' );
+    error_log('=== WC Balíkovna: Starting label generation for order #' . $order->get_id() . ' ===');
+    
+    // Get delivery type
+    $delivery_type = $order->get_meta('_wc_balikovna_delivery_type');
 
-    error_log( sprintf(
-        "DEBUG shipping item for order %d -> method_id: %s | instance_id: %s | method_title: %s",
-        $order->get_id(),
-        var_export( $mi_method, true ),
-        var_export( $mi_instance, true ),
-        var_export( $mi_title, true )
-    ) );
+    if (empty($delivery_type)) {
+        error_log('WC Balíkovna Label ERROR: No delivery type found for order #' . $order->get_id());
+        return array(
+            'success' => false,
+            'message' => __('Tato objednávka není objednávka Balíkovny (chybí delivery_type)', 'wc-balikovna-komplet')
+        );
+    }
+
+    error_log('WC Balíkovna Label: Delivery type: ' . $delivery_type);
+
+    // Check if API credentials are set
+    $api_token = get_option('wc_balikovna_api_token', '');
+    $api_private_key = get_option('wc_balikovna_api_private_key', '');
+    
+    if (empty($api_token)) {
+        error_log('WC Balíkovna Label ERROR: API token not configured');
+        return array(
+            'success' => false,
+            'message' => __('API token není nastaven. Nastavte jej v Nastavení → Balíkovna.', 'wc-balikovna-komplet')
+        );
+    }
+    
+    if (empty($api_private_key)) {
+        error_log('WC Balíkovna Label ERROR: API private key not configured');
+        return array(
+            'success' => false,
+            'message' => __('Privátní klíč API není nastaven. Nastavte jej v Nastavení → Balíkovna.', 'wc-balikovna-komplet')
+        );
+    }
+
+    // Validate sender information
+    $missing_sender_fields = array();
+    $sender_fields = array(
+        'wc_balikovna_sender_name' => 'Jméno odesílatele',
+        'wc_balikovna_sender_street' => 'Ulice odesílatele',
+        'wc_balikovna_sender_city' => 'Město odesílatele',
+        'wc_balikovna_sender_zip' => 'PSČ odesílatele',
+        'wc_balikovna_sender_phone' => 'Telefon odesílatele',
+        'wc_balikovna_sender_email' => 'Email odesílatele',
+    );
+    foreach ($sender_fields as $field => $label) {
+        if (empty(get_option($field))) {
+            $missing_sender_fields[] = $label;
+        }
+    }
+    if (!empty($missing_sender_fields)) {
+        error_log('WC Balíkovna Label ERROR: Missing sender fields: ' . implode(', ', $missing_sender_fields));
+        return array(
+            'success' => false,
+            'message' => sprintf(
+                __('Chybí údaje odesílatele: %s. Doplňte je v Nastavení → Balíkovna.', 'wc-balikovna-komplet'),
+                implode(', ', $missing_sender_fields)
+            )
+        );
+    }
+
+    // Generate label based on delivery type
+    if ($delivery_type === 'box') {
+        return $this->generate_box_label($order);
+    } else {
+        return $this->generate_address_label($order);
+    }
 }
 // --- end TEMP DEBUG ---
 // Robustní detekce delivery type (meta -> fallback na prepare_label_data) + validace proti shipping položkám
