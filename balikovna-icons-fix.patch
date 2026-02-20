@@ -1,0 +1,81 @@
+﻿*** Begin Patch
+*** Update File: includes/class-wc-balikovna-label.php
+@@
+     private function get_piktogram_for_branch_type( $type ) {
+         $map = array(
+             'balikovna' => '05_ukladana_zasilka_10_10.jpg',
+             'box'       => '07_BOX_10_10.jpg',
+             'post'      => '05_ukladana_zasilka_10_10.jpg',
+         );
+         return isset( $map[ $type ] ) ? $map[ $type ] : null;
+     }
+ 
+     // --- konec pomocných metod ---
++/**
++ * Resolve an asset filename to a real existing file path inside plugin (or common fallbacks).
++ *
++ * @param string $filename
++ * @return string empty if not found, otherwise full path to file
++ */
++private function get_asset_path( $filename ) {
++    if ( empty( $filename ) ) {
++        return '';
++    }
++    // Normalize filename (in case someone passed full path already)
++    $filename = ltrim( str_replace( '\\', '/', $filename ), '/' );
++
++    $candidates = array(
++        // primary plugin assets folder (preferred)
++        trailingslashit( WC_BALIKOVNA_PLUGIN_DIR ) . 'assets/' . $filename,
++        // fallback: plugin folder guessed by slug (in case constant differs)
++        WP_PLUGIN_DIR . '/woocommerce-balikovna-komplet/assets/' . $filename,
++        // relative fallback (same directory structure)
++        dirname( __FILE__ ) . '/../assets/' . $filename,
++    );
++
++    foreach ( $candidates as $p ) {
++        if ( file_exists( $p ) ) {
++            return $p;
++        }
++    }
++    return '';
++}
+*** End Patch
+*** Begin Patch
+*** Update File: includes/class-wc-balikovna-label.php
+@@
+-            // Vložíme piktogram a do něj vykreslíme hmotnost (formát x,yy bez jednotky)
+-if ( ! empty( $data['recipient']['branch_icon'] ) ) {
+-    $img_path = WC_BALIKOVNA_PLUGIN_DIR . 'assets/' . $data['recipient']['branch_icon'];
+-} else {
+-    $img_path = WC_BALIKOVNA_PLUGIN_DIR . 'assets/18_hmotnost_hodnota_20_10.jpg'; // fallback
+-}            $x = 80;
++            // Vložíme piktogram a do něj vykreslíme hmotnost (formát x,yy bez jednotky)
++            // Resolve icon file: branch_icon may be either a filename or a "type" key (e.g. 'box'|'balikovna')
++            $img_path = '';
++            if ( ! empty( $data['recipient']['branch_icon'] ) ) {
++                $candidate = $data['recipient']['branch_icon'];
++                // pokud kandidát neobsahuje tečku, považuj ho za typ a mapuj ho na název souboru
++                if ( strpos( $candidate, '.' ) === false ) {
++                    $mapped = $this->get_piktogram_for_branch_type( $candidate );
++                    $candidate_filename = $mapped ? $mapped : $candidate . '.jpg';
++                } else {
++                    $candidate_filename = $candidate;
++                }
++                $img_path = $this->get_asset_path( $candidate_filename );
++            }
++            // pokud není nalezen žádný branch icon soubor, použij defaultní weight icon
++            if ( empty( $img_path ) ) {
++                $img_path = $this->get_asset_path( '18_hmotnost_hodnota_20_10.jpg' );
++            }
++            if ( empty( $img_path ) ) {
++                // finální fallback: přímo z konstanty pluginu
++                $legacy = trailingslashit( WC_BALIKOVNA_PLUGIN_DIR ) . 'assets/18_hmotnost_hodnota_20_10.jpg';
++                if ( file_exists( $legacy ) ) {
++                    $img_path = $legacy;
++                } else {
++                    error_log( 'WC Balíkovna WARNING: piktogram not found for branch_icon: ' . ( $data['recipient']['branch_icon'] ?? 'none' ) );
++                }
++            }
++            $x = 80;
+*** End Patch

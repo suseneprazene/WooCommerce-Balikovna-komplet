@@ -6,13 +6,9 @@
  */
 // dočasně vlož do WC_Balikovna_Komplet::init() na začátek
 
-error_log('BALIKOVNA: končím funkci generate_label()');
-
 if (!defined('ABSPATH')) {
     exit;
 }
-
-require_once __DIR__ . '/class-cpost-api-client.php';
 
 /**
  * WC_Balikovna_Label Class
@@ -50,8 +46,7 @@ class WC_Balikovna_Label
      *
      * @var string
      */
-    private $api_url = 'https://b2b-test.postaonline.cz:444/restservices/ZSKService/v1/';
-
+    private $api_url = 'https://b2b.cpost.cz/services/';
 
     /**
      * Main WC_Balikovna_Label Instance
@@ -95,60 +90,6 @@ public function __construct()
      */
 public function add_label_button($order)
 {
-    // zjistíme, jestli má objednávka nějakou Balíkovna dopravu (meta nebo shipping položka)
-    $delivery_type = $order->get_meta('_wc_balikovna_delivery_type');
-    $branch_name   = $order->get_meta('_wc_balikovna_branch_name');
-    $branch_type   = $order->get_meta('_wc_balikovna_branch_type');
-    $branch_icon   = $order->get_meta('_wc_balikovna_branch_icon');
-
-    // Pokud nemáme uložený delivery_type, zkusíme fallback přes shipping položky a instance nastavení
-    if ( empty( $delivery_type ) ) {
-        $shipping_items = $order->get_items( 'shipping' );
-        foreach ( $shipping_items as $ship_item ) {
-            $method_id   = method_exists( $ship_item, 'get_method_id' ) ? $ship_item->get_method_id() : ( $ship_item['method_id'] ?? '' );
-            $instance_id = method_exists( $ship_item, 'get_instance_id' ) ? $ship_item->get_instance_id() : ( $ship_item['instance_id'] ?? '' );
-            if ( $method_id === 'balikovna' ) {
-                // pokud máme instance_id, zkusíme načíst option z WC_Balikovna_Shipping_Method
-                if ( ! empty( $instance_id ) && class_exists( 'WC_Balikovna_Shipping_Method' ) ) {
-                    try {
-                        $mi = new \WC_Balikovna_Shipping_Method( $instance_id );
-                        $delivery_type = $mi->get_option( 'delivery_type', 'box' );
-                    } catch ( Exception $e ) {
-                        // ignoruj - ponecháme delivery_type prázdné a pokračujeme
-                    }
-                }
-                // pokud branch meta chybí, můžeme si vzít alespoň název z order shipping fields (method_title)
-                if ( empty( $branch_name ) ) {
-                    $branch_name = method_exists( $ship_item, 'get_method_title' ) ? $ship_item->get_method_title() : '';
-                }
-                break;
-            }
-        }
-    }
-
-    // Pokud objednávka vůbec nemá Balíkovna shipping (ani meta, ani shipping item), nic nepřidáme
-    $has_balikovna = ( $order->get_meta('_wc_balikovna_branch_id') || $order->get_meta('_wc_balikovna_branch_name') );
-    if ( ! $has_balikovna ) {
-        // zkusíme kontrolu přes shipping items: pokud existuje položka s method_id=balikovna, považujeme to za Balíkovnu
-        foreach ( $order->get_items( 'shipping' ) as $si ) {
-            if ( method_exists( $si, 'get_method_id' ) && $si->get_method_id() === 'balikovna' ) {
-                $has_balikovna = true;
-                break;
-            }
-        }
-    }
-    if ( ! $has_balikovna ) {
-        return;
-    }
-
-    // Normalizovat hodnotu pro zobrazení
-    if ( empty( $delivery_type ) ) {
-        $delivery_type_label = __( 'unknown', 'wc-balikovna-komplet' );
-    } else {
-        $delivery_type_label = $delivery_type === 'address' ? __( 'Na adresu', 'wc-balikovna-komplet' ) : __( 'Do boxu / pobočky', 'wc-balikovna-komplet' );
-    }
-
-
 // --- START: korektní načtení delivery_type + branch pro admin UI (add_label_button) ---
 $delivery_type = $order->get_meta('_wc_balikovna_delivery_type');
 $branch_name   = $order->get_meta('_wc_balikovna_branch_name');
@@ -159,38 +100,26 @@ $branch_icon   = $order->get_meta('_wc_balikovna_branch_icon');
 // Nepřepisujeme objednávku a nevracíme pole, jen doplníme hodnoty pro UI.
 if ( empty( $delivery_type ) ) {
     $detected = $this->prepare_label_data( $order );
-    if ( ! is_wp_error( $detected ) && !empty( $detected['deliveryType'] ) ) {
-        $delivery_type = $detected['deliveryType'];
-    }
-    if ( ! is_wp_error( $detected ) && !empty( $detected['recipient'] ) && is_array( $detected['recipient'] ) ) {
-        if ( empty( $branch_name ) && ! empty( $detected['recipient']['branch_name'] ) ) {
-            $branch_name = $detected['recipient']['branch_name'];
+    if ( ! is_wp_error( $detected ) ) {
+        if ( ! empty( $detected['deliveryType'] ) ) {
+            $delivery_type = $detected['deliveryType'];
         }
-        if ( empty( $branch_type ) && ! empty( $detected['recipient']['branch_type'] ) ) {
-            $branch_type = $detected['recipient']['branch_type'];
+        if ( ! empty( $detected['recipient'] ) && is_array( $detected['recipient'] ) ) {
+            if ( empty( $branch_name ) && ! empty( $detected['recipient']['branch_name'] ) ) {
+                $branch_name = $detected['recipient']['branch_name'];
+            }
+            if ( empty( $branch_type ) && ! empty( $detected['recipient']['branch_type'] ) ) {
+                $branch_type = $detected['recipient']['branch_type'];
+            }
+            if ( empty( $branch_icon ) && ! empty( $detected['recipient']['branch_icon'] ) ) {
+                $branch_icon = $detected['recipient']['branch_icon'];
+            }
         }
-        if ( empty( $branch_icon ) && ! empty( $detected['recipient']['branch_icon'] ) ) {
-            $branch_icon = $detected['recipient']['branch_icon'];
-        }
-    }
-} else if ( empty( $branch_type ) ) {
-    // Oprav branch_type pokud meta existuje, ale branch_type je prázdné
-    $detected = $this->prepare_label_data( $order );
-    if ( ! is_wp_error( $detected ) && !empty( $detected['recipient']['branch_type'] ) ) {
-        $branch_type = $detected['recipient']['branch_type'];
+    } else {
+        // debug only — nezastavujeme UI
+        error_log( 'WC Balíkovna DEBUG (admin display): prepare_label_data failed: ' . $detected->get_error_message() );
     }
 }
-
-// Výstup pro admin UI — vždy správný typ doručení
-if ( empty( $delivery_type ) ) {
-    $delivery_type_label = __( 'unknown', 'wc-balikovna-komplet' );
-} elseif ( $delivery_type === 'address' ) {
-    $delivery_type_label = __( 'Na adresu', 'wc-balikovna-komplet' );
-} else {
-    $delivery_type_label = __( 'Do boxu / pobočky', 'wc-balikovna-komplet' );
-}
-
-// --- END: korektní načtení ---
 // --- END: korektní načtení delivery_type + branch pro admin UI ---
     // Pokud objednávka vůbec nemá Balíkovna shipping (ani meta, ani shipping item), nic nepřidáme
     $has_balikovna = ( $order->get_meta('_wc_balikovna_branch_id') || $order->get_meta('_wc_balikovna_branch_name') );
@@ -248,22 +177,6 @@ if ( empty( $delivery_type ) ) {
                 <span style="margin-left:8px;"><?php echo esc_html( $branch_type ); ?></span>
             </div>
         <?php endif; ?>
-<?php if ( ! empty( $branch_type ) ) : ?>
-    <div style="margin-bottom:8px;">
-        <strong><?php echo esc_html__( 'Druh pobočky:', 'wc-balikovna-komplet' ); ?></strong>
-        <span style="margin-left:8px;">
-            <?php
-            if ($branch_type === 'box') {
-                echo esc_html__( 'Box', 'wc-balikovna-komplet' );
-            } elseif ($branch_type === 'branch' || $branch_type === 'balikovna') {
-                echo esc_html__( 'Balíkovna (pobočka)', 'wc-balikovna-komplet' );
-            } else {
-                echo esc_html( $branch_type );
-            }
-            ?>
-        </span>
-    </div>
-<?php endif; ?>
 
         <?php if ( $branch_icon_html ) : ?>
             <div style="margin-bottom:12px;">
@@ -421,60 +334,9 @@ jQuery(function($){
      * @param WC_Order $order
      * @return array
      */
-private function balikovna_debug_log($message) {
-    $plugin_dir = dirname(__FILE__, 2); // root folder pluginu
-    $log_file = $plugin_dir . '/balikovna-debug.log';
-    $time = date('Y-m-d H:i:s');
-    if (is_array($message) || is_object($message)) {
-        $msg = $time . " | " . print_r($message, true) . "\n";
-    } else {
-        $msg = $time . " | " . $message . "\n";
-    }
-    @file_put_contents($log_file, $msg, FILE_APPEND | LOCK_EX);
-}
-	 
-public function generate_label($order)
-{
-    $this->balikovna_debug_log('--- === Spouštím generate_label pro objednávku ID: ' . (method_exists($order, 'get_id') ? $order->get_id() : '[neznámý]') . ' === ---');
-
-    $this->balikovna_debug_log([
-        'stav_před_API' => [
-            'order_id' => method_exists($order, 'get_id') ? $order->get_id() : '',
-            'delivery_type' => $order->get_meta('_wc_balikovna_delivery_type')
-        ]
-    ]);
-
-    // ZKONTROLUJ OBJEKT $api
-    if (!isset($api) || !is_object($api)) {
-        $this->balikovna_debug_log('ERROR: Objekt $api není dostupný nebo není objekt!');
-    } else {
-        $this->balikovna_debug_log('OK: Objekt $api existuje.');
-    }
-
-    // ZKONTROLUJ $data
-    if (!isset($data) || empty($data)) {
-        $this->balikovna_debug_log('ERROR: Proměnná $data není nastavena nebo je prázdná!');
-    } else {
-        $this->balikovna_debug_log('OK: payload $data připraven.', $data);
-    }
-
-    //----- POKUS O VYVOLÁNÍ EXCEPTION
-    try {
-        $this->balikovna_debug_log('ZKOUŠÍM VOLÁNÍ $api->call...');
-        $response = $api->call('parcelService', $data);
-        $this->balikovna_debug_log(['API call ODPověď' => $response]);
-    } catch (\Throwable $e) {
-        $this->balikovna_debug_log([
-            'FATAL ERROR v $api->call!' => $e->getMessage(),
-            'file' => $e->getFile(),
-            'line' => $e->getLine(),
-            'trace' => $e->getTraceAsString(),
-        ]);
-        return array('success' => false, 'message' => 'Fatální chyba v komunikaci s API: ' . $e->getMessage());
-    }
-    // ...dál pokračuj jak bylo
-
-
+    public function generate_label($order)
+    {
+        error_log('=== WC Balíkovna: Starting label generation for order #' . $order->get_id() . ' ===');
 		
 		// --- TEMP DEBUG: dump order meta + shipping items for diagnostics ---
 error_log( sprintf( 'DEBUG: order #%d _wc_balikovna_delivery_type=%s', $order->get_id(), var_export( $order->get_meta('_wc_balikovna_delivery_type'), true ) ) );
@@ -657,136 +519,211 @@ if ( empty( $delivery_type ) ) {
             );
         }
 
-// voláš, když máš všechna order data!
-$api_url     = 'https://b2b.postaonline.cz:444/restservices/ZSKService/v1/'; // ostré, nebo test: https://b2b-test.postaonline.cz:444/restservices/ZSKService/v1/
-$api_token   = get_option('wc_balikovna_api_token', '');
-$secret_key  = get_option('wc_balikovna_api_private_key', '');
-
-// Inicializace API objektu a sestavení dat:
-$api = new CPost_API_Client($api_url, $api_token, $secret_key);
-// Sestavení payloadu pro API:
-$data = array(
-    // ...
-);
-
-// Nyní až debug blok:
-$this->balikovna_debug_log([
-    'stav_před_API' => [
-        'order_id' => method_exists($order, 'get_id') ? $order->get_id() : '',
-        'delivery_type' => $order->get_meta('_wc_balikovna_delivery_type'),
-        'api_url' => $api_url,
-        'data' => $data,
-    ]
-]);
-
-if (!isset($api) || !is_object($api)) {
-    $this->balikovna_debug_log('ERROR: Objekt $api není dostupný nebo není objekt!');
-    return ['success' => false, 'message' => 'API třída není inicializována.'];
-}
-if (!isset($data) || empty($data)) {
-    $this->balikovna_debug_log('ERROR: Proměnná $data není nastavena nebo je prázdná!');
-    return ['success' => false, 'message' => 'Data pro volání API nebyla sestavena.'];
-}
-
-try {
-    $this->balikovna_debug_log('ZKOUŠÍM VOLÁNÍ $api->call...');
-    $response = $api->call('parcelService', $data);
-    $this->balikovna_debug_log(['API call odpověď' => $response]);
-} catch (\Throwable $e) {
-    $this->balikovna_debug_log([
-        'FATAL ERROR v $api->call!' => $e->getMessage(),
-        'file' => $e->getFile(),
-        'line' => $e->getLine(),
-        'trace' => $e->getTraceAsString(),
-    ]);
-    return array('success' => false, 'message' => 'Fatální chyba v komunikaci s API: ' . $e->getMessage());
-}
-// Rozlišení typů zásilky
-$deliveryType = $order->get_meta('_wc_balikovna_delivery_type'); // box/adresa
-$prefix = ($deliveryType === 'box' || $deliveryType === 'balikovna') ? 'NB' : 'DR'; // DR = adresní zásilka, NB balíkovna
-
-$data = array(
-    'parcelServiceHeader' => array(
-        'parcelServiceHeaderCom' => array(
-            'transmissionDate' => date('Y-m-d'), // dnešní datum
-            'customerID'      => get_option('wc_balikovna_customer_id', 'TVUJ_CUST_ID'), // doplň do nastavení pluginu
-            'postCode'        => get_option('wc_balikovna_postcode', 'YOUR_POSTCODE'),    // podací pošta; doplň taky
-        ),
-        'printParams' => array(
-            'idForm' => 'FORM_ID',  // nutno získat z dokumentace ČP nebo od obchodníka – jiný pro box/adresa!
-            'shiftHorizontal' => 0,
-            'shiftVertical' => 0,
-        ),
-        'position' => 1
-    ),
-    'parcelServiceData' => array(
-        'parcelParams' => array(
-            'prefixParcelCode' => $prefix,
-            'weight'           => round($this->calculate_order_weight($order) * 100), // setiny kg!
-            'insuredValue'     => $order->get_total(),
-            'amount'           => $order->get_payment_method() === 'cod' ? $order->get_total() : 0,
-            'notePrint'        => 'Obj. ' . $order->get_order_number(),
-        ),
-        'parcelAddress' => array(
-            'firstName'   => $order->get_shipping_first_name() ?: $order->get_billing_first_name(),
-            'surname'     => $order->get_shipping_last_name() ?: $order->get_billing_last_name(),
-            'address' => array(
-                'street'   => $order->get_shipping_address_1() ?: $order->get_billing_address_1(),
-                'city'     => $order->get_shipping_city() ?: $order->get_billing_city(),
-                'zipCode'  => $deliveryType == 'box'
-                                ? ($order->get_meta('_wc_balikovna_branch_zip') ?: $order->get_shipping_postcode())
-                                : ($order->get_shipping_postcode() ?: $order->get_billing_postcode()),
-            ),
-            'emailAddress' => $order->get_billing_email(),
-            'phoneNumber'  => $order->get_billing_phone(),
-        ),
-        // další pole podle potřeby
-    ),
-);
-
-// Pokud je "box", je potřeba doplnit do adresy místo branch zipkód, do jména lze připsat název pobočky atd.
-
-$response = $api->call('parcelService', $data);
-
-if (!$response['success']) {
-    return array('success' => false, 'message' => 'Chyba napojení na ČP API: ' . esc_html($response['error']));
-}
-
-$res_body = $response['body'];
-
-// Vytáhni čárový kód a base64 štítek
-if (isset($res_body['responseHeader']['resultParcelData']['parcelCode'])) {
-    $parcelCode = $res_body['responseHeader']['resultParcelData']['parcelCode'];
-    $order->update_meta_data('_wc_balikovna_parcel_code', $parcelCode);
-
-    // Získání štítku
-    if (!empty($res_body['printingDataResult'])) {
-        // base64 decode a ulož PDF
-        $pdf_content = base64_decode($res_body['printingDataResult']);
-        $upload_dir = wp_upload_dir();
-        $filename  = 'balikovna_label_' . sanitize_file_name($order->get_order_number()) . '_' . $parcelCode . '.pdf';
-        $filepath  = trailingslashit($upload_dir['basedir']) . 'wc-balikovna-labels/' . $filename;
-        if (!file_exists(dirname($filepath))) {
-            wp_mkdir_p(dirname($filepath));
+        // Generate label based on delivery type
+        if ($delivery_type === 'box') {
+            $result = $this->generate_box_label($order);
+        } else {
+            $result = $this->generate_address_label($order);
         }
-        file_put_contents($filepath, $pdf_content);
-        $label_url = trailingslashit($upload_dir['baseurl']) . 'wc-balikovna-labels/' . $filename;
-        $order->update_meta_data('_wc_balikovna_label_url', $label_url);
-        $order->update_meta_data('_wc_balikovna_label_generated', 'yes');
-        $order->save();
 
-        return array(
-            'success' => true,
-            'label_url' => $label_url,
-            'message' => 'Štítek úspěšně vygenerován z API ČP.'
-        );
+        error_log('WC Balíkovna: Label generation result: ' . ($result['success'] ? 'SUCCESS' : 'FAILED'));
+        if (!$result['success']) {
+            error_log('WC Balíkovna Label ERROR: ' . $result['message']);
+        }
+        error_log('=== WC Balíkovna: Label generation finished ===');
+
+        return $result;
     }
-    // Pokud není štítek ve výsledku
-    return array('success' => false, 'message' => 'API nevrátilo štítek (printingDataResult).');
-} else {
-    return array('success' => false, 'message' => 'API nevrátilo parcelCode: ' . print_r($res_body, true));
+
+    /**
+     * Generate label for Box delivery type
+     *
+     * @param WC_Order $order
+     * @return array
+     */
+    private function generate_box_label($order)
+    {
+        // Get branch data
+        $branch_id = $order->get_meta('_wc_balikovna_branch_id');
+        $branch_name = $order->get_meta('_wc_balikovna_branch_name');
+        
+        error_log('WC Balíkovna Label: Branch ID: ' . $branch_id);
+        error_log('WC Balíkovna Label: Branch Name: ' . $branch_name);
+
+        if (empty($branch_id)) {
+            error_log('WC Balíkovna Label ERROR: Branch ID is empty for order #' . $order->get_id());
+            return array(
+                'success' => false,
+                'message' => __('Pobočka nebyla vybrána při objednávce. ID pobočky chybí.', 'wc-balikovna-komplet')
+            );
+        }
+
+        // Validate required order data
+        $validation = $this->validate_order_data($order);
+        if (!$validation['valid']) {
+            error_log('WC Balíkovna Label ERROR: Missing order fields: ' . implode(', ', $validation['missing_fields']));
+            return array(
+                'success' => false,
+                'message' => sprintf(
+                    __('Chybí údaje objednávky: %s', 'wc-balikovna-komplet'),
+                    implode(', ', $validation['missing_fields'])
+                )
+            );
+        }
+
+        // Prepare data for API
+        $data = array(
+            'deliveryType' => 'box',
+            'branchId' => $branch_id,
+            'branchName' => $branch_name,
+            'orderNumber' => $order->get_order_number(),
+            'customerName' => $this->get_customer_name($order),
+            'customerEmail' => $order->get_billing_email(),
+            'customerPhone' => $order->get_billing_phone(),
+            'weight' => $this->calculate_order_weight($order),
+            'codAmount' => $order->get_payment_method() === 'cod' ? $order->get_total() : 0,
+        );
+        
+        error_log('WC Balíkovna Label: Prepared data: ' . json_encode($data));
+
+ // Připravíme data pro PDF (pouze jednou) a vynutíme deliveryType = 'box'
+$prepared = $this->prepare_label_data( $order );
+if ( is_wp_error( $prepared ) ) {
+    return array(
+        'success' => false,
+        'message' => $prepared->get_error_message()
+    );
 }
-} // Konec funkce generate_label
+
+// FORCE deliveryType = 'box' (aby build_pdf použil balíkovna šablonu)
+$prepared['deliveryType'] = 'box';
+
+// Vytvoříme PDF
+$pdf_result = $this->build_pdf_from_template( $prepared );
+if ( is_wp_error( $pdf_result ) ) {
+    return array(
+        'success' => false,
+        'message' => $pdf_result->get_error_message()
+    );
+}
+
+        if ( isset( $pdf_result['success'] ) && $pdf_result['success'] && ! empty( $pdf_result['url'] ) ) {
+            // Save label info to order
+            $order->update_meta_data('_wc_balikovna_label_generated', 'yes');
+            $order->update_meta_data('_wc_balikovna_label_url', $pdf_result['url']);
+            $order->update_meta_data('_wc_balikovna_label_date', current_time('mysql'));
+            $order->save();
+
+            error_log('WC Balíkovna Label: Label saved to order meta (generated PDF)');
+
+            return array(
+                'success' => true,
+                'label_url' => $pdf_result['url'],
+                'message' => __('Štítek byl úspěšně vygenerován', 'wc-balikovna-komplet')
+            );
+        } else {
+            return array(
+                'success' => false,
+                'message' => __('Chyba při generování PDF štítku', 'wc-balikovna-komplet')
+            );
+        } 
+    }
+
+    /**
+     * Generate label for Address delivery type
+     *
+     * @param WC_Order $order
+     * @return array
+     */
+    private function generate_address_label($order)
+    {
+        // Get shipping address
+        $address = $order->get_shipping_address_1() ?: $order->get_billing_address_1();
+        $city = $order->get_shipping_city() ?: $order->get_billing_city();
+        $postcode = $order->get_shipping_postcode() ?: $order->get_billing_postcode();
+        
+        error_log('WC Balíkovna Label: Address: ' . $address . ', ' . $city . ', ' . $postcode);
+
+        if (empty($address) || empty($city) || empty($postcode)) {
+            error_log('WC Balíkovna Label ERROR: Incomplete delivery address for order #' . $order->get_id());
+            $missing = array();
+            if (empty($address)) $missing[] = 'Ulice';
+            if (empty($city)) $missing[] = 'Město';
+            if (empty($postcode)) $missing[] = 'PSČ';
+            
+            return array(
+                'success' => false,
+                'message' => sprintf(
+                    __('Dodací adresa není kompletní. Chybí: %s', 'wc-balikovna-komplet'),
+                    implode(', ', $missing)
+                )
+            );
+        }
+        
+        // Validate required order data
+        $validation = $this->validate_order_data($order);
+        if (!$validation['valid']) {
+            error_log('WC Balíkovna Label ERROR: Missing order fields: ' . implode(', ', $validation['missing_fields']));
+            return array(
+                'success' => false,
+                'message' => sprintf(
+                    __('Chybí údaje objednávky: %s', 'wc-balikovna-komplet'),
+                    implode(', ', $validation['missing_fields'])
+                )
+            );
+        }
+
+        // Prepare data for API
+        $data = array(
+            'deliveryType' => 'address',
+            'address' => $address,
+            'city' => $city,
+            'postcode' => $postcode,
+            'orderNumber' => $order->get_order_number(),
+            'customerName' => $this->get_customer_name($order),
+            'customerEmail' => $order->get_billing_email(),
+            'customerPhone' => $order->get_billing_phone(),
+            'weight' => $this->calculate_order_weight($order),
+            'codAmount' => $order->get_payment_method() === 'cod' ? $order->get_total() : 0,
+        );
+        
+        error_log('WC Balíkovna Label: Prepared data: ' . json_encode($data));
+
+        // --- Nahraď tento blok (místo volání API a zpracování výsledku) ---
+    $prepared = $this->prepare_label_data( $order );
+if ( is_wp_error( $prepared ) ) {
+    return array(
+        'success' => false,
+        'message' => $prepared->get_error_message()
+    );
+}
+
+// FORCE deliveryType = 'address' (aby build_pdf použil adresní šablonu)
+$prepared['deliveryType'] = 'address';
+
+$pdf_result = $this->build_pdf_from_template( $prepared );
+
+        if ( isset( $pdf_result['success'] ) && $pdf_result['success'] && ! empty( $pdf_result['url'] ) ) {
+            // Save label info to order
+            $order->update_meta_data('_wc_balikovna_label_generated', 'yes');
+            $order->update_meta_data('_wc_balikovna_label_url', $pdf_result['url']);
+            $order->update_meta_data('_wc_balikovna_label_date', current_time('mysql'));
+            $order->save();
+
+            error_log('WC Balíkovna Label: Label saved to order meta (generated PDF)');
+
+            return array(
+                'success' => true,
+                'label_url' => $pdf_result['url'],
+                'message' => __('Štítek byl úspěšně vygenerován', 'wc-balikovna-komplet')
+            );
+        } else {
+            return array(
+                'success' => false,
+                'message' => __('Chyba při generování PDF štítku', 'wc-balikovna-komplet')
+            );
+        } 
+    }
 
     // --- Přidat: pomocné metody pro přípravu dat a generování PDF (vložit PŘED metodou call_api) ---
 
@@ -841,7 +778,6 @@ if ( $branch_icon ) $recipient['branch_icon'] = $branch_icon;
 
         // Spočítat hmotnost (převod podle nastavení WooCommerce na kg)
         $weight_kg = $this->calculate_order_weight( $order );
-
 
 // --- START: robustní určení deliveryType (nahraď původní blok) ---
 $delivery_type = $order->get_meta('_wc_balikovna_delivery_type');
@@ -903,30 +839,40 @@ if ( empty( $delivery_type ) ) {
             if ( ! empty( $maybe_meta ) ) {
                 $delivery_type = $maybe_meta;
                 error_log( 'prepare_label_data - delivery_type taken from order meta fallback: ' . $delivery_type );
-
                 break;
             }
         }
     }
 }
 
-
-// poslední fallback
+// poslední fallback: 'box'
 if ( empty( $delivery_type ) ) {
     $delivery_type = 'box';
-
+    error_log( 'prepare_label_data - delivery_type fallback to box for order #' . $order->get_id() );
 }
 // --- END: robustní určení deliveryType ---
+
 return array(
     'sender'       => $sender,
     'recipient'    => $recipient,
     'weight'       => $weight_kg,
     'deliveryType' => $delivery_type,
 );
-} // <-- Tato závorka musí být, aby jsi ukončil funkci prepare_label_data!
+    }
+
+    /**
+     * Vytvoří PDF štítek z template (FPDI + TCPDF nebo FPDI+FPDF fallback).
+     *
+     * @param array $data Výstup z prepare_label_data()
+     * @return array|WP_Error ['success'=>true,'url'=>'...'] nebo WP_Error
+     */
+	 /**
 
 /**
- * Vrátí layout/positioning ...
+ * Vrátí layout/positioning nastavení pro danou šablonu (klíč 'box' nebo 'address' apod.)
+ *
+ * @param string $template_key normalized deliveryType (např. 'box' nebo 'address')
+ * @return array Associative array of layout settings (mm, font sizes, offsets...)
  */
 private function get_template_layout_settings( $template_key ) {
     // default settings (bezpečný fallback)
@@ -968,28 +914,6 @@ private function get_template_layout_settings( $template_key ) {
     return array_merge( $defaults, $overrides );
 }
 
-private function get_piktogram_for_branch($branch_type, $delivery_type) {
-    $filename = '';
-    // Při doručení NA ADRESU
-    if ($delivery_type === 'address') {
-        $filename = '04_balikovna na adresu_10_10.jpg';
-    }
-    // Při doručení do BOXU (zásilkový box, automat)
-    else if ($delivery_type === 'box' || $branch_type === 'box') {
-        $filename = '07_BOX_10_10.jpg';
-    }
-    // Při doručení na POBOČKU BALÍKOVNY
-    else if ($delivery_type === 'balikovna' || $branch_type === 'branch') {
-        $filename = '05_ukladana_zasilka_10_10.jpg';
-    }
-    // Možné fallbacky (pro jistotu, pokud typ není jednoznačný)
-    else {
-        $filename = '05_ukladana_zasilka_10_10.jpg';
-    }
-    return $this->get_asset_path($filename);
-}
-
-
 private function build_pdf_from_template( $data ) {
     // Load autoloads / bundled libs
     $autoload = WC_BALIKOVNA_PLUGIN_DIR . 'vendor/autoload.php';
@@ -1028,10 +952,7 @@ $log = function( $message ) use ( $log_file ) {
 $rawDelivery = isset( $data['deliveryType'] ) ? $data['deliveryType'] : 'NULL';
 $log( 'build_pdf_from_template - raw deliveryType: ' . var_export( $rawDelivery, true ) );
 
-
-
 // --- START: normalized deliveryType, layout selection, template load & PDF init (replace duplicated block) ---
-
 // Normalizace hodnoty (trim + lowercase)
 $deliveryTypeNormalized = is_string( $rawDelivery ) ? strtolower( trim( $rawDelivery ) ) : '';
 if ( $deliveryTypeNormalized === '' ) {
@@ -1039,11 +960,8 @@ if ( $deliveryTypeNormalized === '' ) {
 }
 $log( 'build_pdf_from_template - normalized deliveryType: ' . $deliveryTypeNormalized );
 
-
-
 // získej layout nastavení podle template (delivery type) — jen jednou
 $layout = $this->get_template_layout_settings( $deliveryTypeNormalized );
-
 
 // Vybereme šablonu podle delivery type (default = box)
 $template_name = 'BAL_stitek_HD_balikovna.pdf'; // default pro box
@@ -1069,41 +987,6 @@ if ( ! file_exists( $template_path ) ) {
 } else {
     $log( 'build_pdf_from_template - template file exists: ' . $template_path );
 }
-
-        // Instantiate appropriate FPDI class
-        if ( class_exists( '\setasign\Fpdi\Tcpdf\Fpdi' ) ) {
-            $pdf = new \setasign\Fpdi\Tcpdf\Fpdi();
-        } elseif ( class_exists( '\setasign\Fpdi\Fpdi' ) ) {
-            $pdf = new \setasign\Fpdi\Fpdi();
-        } else {
-            return new WP_Error( 'no_pdf_engine', 'Nevhodná PDF knihovna' );
-        }
-
-        // Metadata
-        if ( method_exists( $pdf, 'SetCreator' ) ) {
-            $pdf->SetCreator( 'WooCommerce Balíkovna' );
-            $pdf->SetAuthor( get_bloginfo( 'name' ) );
-            $pdf->SetTitle( 'Balíkovna - Štítek' );
-        }
-        if ( method_exists( $pdf, 'SetPrintHeader' ) ) {
-            $pdf->SetPrintHeader( false );
-            $pdf->SetPrintFooter( false );
-        }
-
-        // Load template
-        $pageCount = $pdf->setSourceFile( $template_path );
-        $tplId = $pdf->importPage( 1 );
-
-        $pdf->AddPage();
-        $pdf->useTemplate( $tplId, 0, 0 );
-
-        // Font (TCPDF supports UTF-8)
-        if ( method_exists( $pdf, 'SetFont' ) ) {
-            $pdf->SetFont( 'dejavusans', '', 10 );
-        }
-
-        $maxWidth = 85; // uprav dle šablony
-
 
 // Instantiate appropriate FPDI class (jen tady)
 if ( class_exists( '\setasign\Fpdi\Tcpdf\Fpdi' ) ) {
@@ -1149,7 +1032,6 @@ $icons_offset   = isset( $layout['icons_offset'] ) ? $layout['icons_offset'] : (
 // Poznámka: $iconsY_mm počítej až až - tam kde máš smysl zavolat $pdf->GetY() (po vykreslení adresy/odesílatele).
 // --- END replacement ---
 
-
         // --- Odesílatel ---
         $senderX = 12;
         $senderY = 17;
@@ -1162,13 +1044,6 @@ $icons_offset   = isset( $layout['icons_offset'] ) ? $layout['icons_offset'] : (
             '463 42',
         );
 
-
-        $font_family = 'dejavusans';
-        $font_style = '';
-        $fontSize = 10;
-        $minFontSize = 3;
-        $lineGap = 1;
-
 // respektuj hodnoty z $layout pokud už byly nastaveny, jinak použij bezpečné defaulty
 $font_family = isset( $font_family ) && $font_family ? $font_family : ( isset( $layout['font_family'] ) ? $layout['font_family'] : 'dejavusans' );
 $font_style  = isset( $font_style ) ? $font_style : '';
@@ -1178,7 +1053,6 @@ $lineGap     = isset( $lineGap ) ? $lineGap : 1;
 
 $fontSizeBold   = isset( $fontSizeBold ) && $fontSizeBold ? $fontSizeBold : ( isset( $layout['font_size_bold'] ) ? $layout['font_size_bold'] : 12 );
 $fontSizeNormal = isset( $fontSizeNormal ) && $fontSizeNormal ? $fontSizeNormal : ( isset( $layout['font_size_normal'] ) ? $layout['font_size_normal'] : 11 );
-
 
         $fits = false;
         while ( $fontSize >= $minFontSize ) {
@@ -1222,11 +1096,6 @@ $fontSizeNormal = isset( $fontSizeNormal ) && $fontSizeNormal ? $fontSizeNormal 
         }
         $pdf->SetY( $curY + 1 );
 
-
-        // --- Adresát ---
-        $recipientX = 12;
-        $recipientY = 45;
-
 // --- Adresát ---
 
 // Pokud jde o box šablonu, posuň adresát níže (doladit hodnotu podle potřeby)
@@ -1238,7 +1107,6 @@ if ( isset( $deliveryTypeNormalized ) && $deliveryTypeNormalized === 'box' ) {
         $senderY = $senderY; // ponechat odesílatele -- nebo uprav např. $senderY += 0;
     }
 }
-
 
         $recipient_name = !empty($data['recipient']['name']) ? wp_strip_all_tags($data['recipient']['name']) : '';
         $address1 = !empty($data['recipient']['street']) ? wp_strip_all_tags($data['recipient']['street']) : '';
@@ -1347,7 +1215,6 @@ $leftY = 120;   // doleva/nahoru doladění pro levý piktogram (doplň; kladné
 $weight_vertical_adjust_mm = 5.0; // kolik mm posunout hmotnost dolů oproti adresní lince (zvýšit = více dolů)
 $weight_text_vertical_extra = 2.0; // další jemné doladění pro text uvnitř hmotnostního piktogramu
 
-
 // Levý piktogram - očekávané jméno; kód zkusí tolerantní varianty
 $left_candidate = '04_balikovna na adresu_10_10.jpg';
 $left_img_path = $this->get_asset_path( $left_candidate );
@@ -1355,13 +1222,6 @@ if ( empty( $left_img_path ) ) {
     $alt = str_replace( ' ', '_', $left_candidate );
     $left_img_path = $this->get_asset_path( $alt );
 }
-
-// Levý piktogram - výběr podle typu; NEPOUŽÍVEJ $left_candidate, pouze funkci!
-$left_img_path = $this->get_piktogram_for_branch(
-    isset($data['recipient']['branch_type']) ? $data['recipient']['branch_type'] : '',
-    isset($data['deliveryType']) ? $data['deliveryType'] : ''
-);
-
 // další tolerantní hledání
 if ( empty( $left_img_path ) ) {
     $assets = glob( trailingslashit( WC_BALIKOVNA_PLUGIN_DIR ) . 'assets/*.{jpg,png}', GLOB_BRACE );
@@ -1387,16 +1247,11 @@ $leftW  = 10; $leftH  = 10;
 $rightW = 20; $rightH = 10;
 
 // --- Ikony: posun obou ikon níž + posun textu hmotnosti doprava ---
-
-// reference jako dřív
-$iconsY_mm = $pdf->GetY() + 5;
-
 // vypočítat offset ikon podle layoutu (fallback 5 mm)
 $icons_offset = isset( $layout['icons_offset'] )
     ? $layout['icons_offset']
     : ( isset( $layout['icons_offset_box_down'] ) && $deliveryTypeNormalized === 'box' ? $layout['icons_offset_box_down'] : ( isset( $layout['icons_offset_default'] ) ? $layout['icons_offset_default'] : 5 ) );
 $iconsY_mm = $pdf->GetY() + $icons_offset;
-
 
 // rozměry (nezměněno)
 $leftW  = 10; $leftH  = 10;
@@ -1414,11 +1269,7 @@ $leftY  = $iconsY_mm + $vertical_shift_mm;
 $rightY = $iconsY_mm + $vertical_shift_mm;
 
 // POSUN TEXTU HMOTNOSTI (vodorovně / svisle)
-
-$weight_text_horizontal_shift = 4.0; // pozitivní = posun doprava (nastavit podle potřeby)
-
 $weight_text_horizontal_shift = 3.5; // pozitivní = posun doprava (nastavit podle potřeby)
-
 $weight_text_vertical_extra   = 2.0; // již používané drobné doladění (ponechat/ladit)
 
 
