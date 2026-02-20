@@ -437,41 +437,7 @@ public function generate_label($order)
 {
     $this->balikovna_debug_log('--- === Spouštím generate_label pro objednávku ID: ' . (method_exists($order, 'get_id') ? $order->get_id() : '[neznámý]') . ' === ---');
 
-    $this->balikovna_debug_log([
-        'stav_před_API' => [
-            'order_id' => method_exists($order, 'get_id') ? $order->get_id() : '',
-            'delivery_type' => $order->get_meta('_wc_balikovna_delivery_type')
-        ]
-    ]);
 
-    // ZKONTROLUJ OBJEKT $api
-    if (!isset($api) || !is_object($api)) {
-        $this->balikovna_debug_log('ERROR: Objekt $api není dostupný nebo není objekt!');
-    } else {
-        $this->balikovna_debug_log('OK: Objekt $api existuje.');
-    }
-
-    // ZKONTROLUJ $data
-    if (!isset($data) || empty($data)) {
-        $this->balikovna_debug_log('ERROR: Proměnná $data není nastavena nebo je prázdná!');
-    } else {
-        $this->balikovna_debug_log('OK: payload $data připraven.', $data);
-    }
-
-    //----- POKUS O VYVOLÁNÍ EXCEPTION
-    try {
-        $this->balikovna_debug_log('ZKOUŠÍM VOLÁNÍ $api->call...');
-        $response = $api->call('parcelService', $data);
-        $this->balikovna_debug_log(['API call ODPověď' => $response]);
-    } catch (\Throwable $e) {
-        $this->balikovna_debug_log([
-            'FATAL ERROR v $api->call!' => $e->getMessage(),
-            'file' => $e->getFile(),
-            'line' => $e->getLine(),
-            'trace' => $e->getTraceAsString(),
-        ]);
-        return array('success' => false, 'message' => 'Fatální chyba v komunikaci s API: ' . $e->getMessage());
-    }
     // ...dál pokračuj jak bylo
 
 
@@ -668,7 +634,41 @@ $api = new CPost_API_Client($api_url, $api_token, $secret_key);
 $data = array(
     // ...
 );
+    $this->balikovna_debug_log([
+        'stav_před_API' => [
+            'order_id' => method_exists($order, 'get_id') ? $order->get_id() : '',
+            'delivery_type' => $order->get_meta('_wc_balikovna_delivery_type')
+        ]
+    ]);
 
+    // ZKONTROLUJ OBJEKT $api
+    if (!isset($api) || !is_object($api)) {
+        $this->balikovna_debug_log('ERROR: Objekt $api není dostupný nebo není objekt!');
+    } else {
+        $this->balikovna_debug_log('OK: Objekt $api existuje.');
+    }
+
+    // ZKONTROLUJ $data
+    if (!isset($data) || empty($data)) {
+        $this->balikovna_debug_log('ERROR: Proměnná $data není nastavena nebo je prázdná!');
+    } else {
+        $this->balikovna_debug_log('OK: payload $data připraven.', $data);
+    }
+
+    //----- POKUS O VYVOLÁNÍ EXCEPTION
+    try {
+        $this->balikovna_debug_log('ZKOUŠÍM VOLÁNÍ $api->call...');
+        $response = $api->call('parcelService', $data);
+        $this->balikovna_debug_log(['API call ODPověď' => $response]);
+    } catch (\Throwable $e) {
+        $this->balikovna_debug_log([
+            'FATAL ERROR v $api->call!' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        return array('success' => false, 'message' => 'Fatální chyba v komunikaci s API: ' . $e->getMessage());
+    }
 // Nyní až debug blok:
 $this->balikovna_debug_log([
     'stav_před_API' => [
@@ -702,8 +702,11 @@ try {
     return array('success' => false, 'message' => 'Fatální chyba v komunikaci s API: ' . $e->getMessage());
 }
 // Rozlišení typů zásilky
-$deliveryType = $order->get_meta('_wc_balikovna_delivery_type'); // box/adresa
-$prefix = ($deliveryType === 'box' || $deliveryType === 'balikovna') ? 'NB' : 'DR'; // DR = adresní zásilka, NB balíkovna
+$deliveryType = $order->get_meta('_wc_balikovna_delivery_type');
+if (!$deliveryType) { $deliveryType = 'box'; } // fallback, nebo detekce, jakou v pluginu používáš
+
+$prefix = ($deliveryType === 'box' || $deliveryType === 'balikovna') ? 'NB' : 'DR';
+
 
 $data = array(
     'parcelServiceHeader' => array(
