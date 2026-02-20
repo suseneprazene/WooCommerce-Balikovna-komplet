@@ -225,6 +225,8 @@ if ( empty( $delivery_type ) ) {
         }
     }
 
+
+
     // render sekce v adminu (zachováme původní tlačítka)
     ?>
     <div class="wc-balikovna-label-section" style="margin-top: 20px; padding: 15px; background: #f9f9f9; border: 1px solid #ddd;">
@@ -433,33 +435,11 @@ private function balikovna_debug_log($message) {
     @file_put_contents($log_file, $msg, FILE_APPEND | LOCK_EX);
 }
 	 
-public function generate_label($order)
-{
-    $this->balikovna_debug_log('--- === Spouštím generate_label pro objednávku ID: ' . (method_exists($order, 'get_id') ? $order->get_id() : '[neznámý]') . ' === ---');
 
-
-    // ...dál pokračuj jak bylo
-
-
-		
-		// --- TEMP DEBUG: dump order meta + shipping items for diagnostics ---
-error_log( sprintf( 'DEBUG: order #%d _wc_balikovna_delivery_type=%s', $order->get_id(), var_export( $order->get_meta('_wc_balikovna_delivery_type'), true ) ) );
-
-foreach ( $order->get_items( 'shipping' ) as $si_debug ) {
-    $mi_method   = method_exists( $si_debug, 'get_method_id' )   ? $si_debug->get_method_id()   : ( $si_debug['method_id']   ?? '' );
-    $mi_instance = method_exists( $si_debug, 'get_instance_id' ) ? $si_debug->get_instance_id() : ( $si_debug['instance_id'] ?? '' );
-    $mi_title    = method_exists( $si_debug, 'get_method_title' )? $si_debug->get_method_title(): ( $si_debug['method_title'] ?? '' );
-
-    error_log( sprintf(
-        "DEBUG shipping item for order %d -> method_id: %s | instance_id: %s | method_title: %s",
-        $order->get_id(),
-        var_export( $mi_method, true ),
-        var_export( $mi_instance, true ),
-        var_export( $mi_title, true )
-    ) );
-}
 // --- end TEMP DEBUG ---
         // --- TEMP DEBUG: dump order meta + shipping items for diagnostics ---
+public function generate_label($order)
+{
 error_log( 'DEBUG: order #' . $order->get_id() . ' _wc_balikovna_delivery_type=' . var_export( $order->get_meta('_wc_balikovna_delivery_type'), true ) );
 foreach ( $order->get_items( 'shipping' ) as $si_debug ) {
     $mi_method   = method_exists( $si_debug, 'get_method_id' )   ? $si_debug->get_method_id()   : ( $si_debug['method_id']   ?? '' );
@@ -1679,4 +1659,81 @@ private function get_asset_path( $filename ) {
         // ensure reasonable precision
         return round( (float) $weight_kg, 6 );
     }
+	
+	public function generate_box_label($order)
+{
+    // Správný prefix a delivery type pro box:
+    $prefix = 'NB';
+    $deliveryType = 'box';
+
+    // Payload pro API
+    $data = array(
+        'parcelServiceHeader' => array(
+            'parcelServiceHeaderCom' => array(
+                'transmissionDate' => date('Y-m-d'),
+                'customerID'      => get_option('wc_balikovna_customer_id', ''),
+                'postCode'        => get_option('wc_balikovna_postcode', ''),
+            ),
+            'printParams' => array(
+                'idForm' => 'FORM_ID', // ZMĚŇ! - podle ČP dokumentace
+                'shiftHorizontal' => 0,
+                'shiftVertical' => 0,
+            ),
+            'position' => 1
+        ),
+        'parcelServiceData' => array(
+            'parcelParams' => array(
+                'prefixParcelCode' => $prefix,
+                'weight'           => round($this->calculate_order_weight($order) * 100),
+                'insuredValue'     => $order->get_total(),
+                'amount'           => $order->get_payment_method() === 'cod' ? $order->get_total() : 0,
+                'notePrint'        => 'Obj. ' . $order->get_order_number(),
+            ),
+            'parcelAddress' => array(
+                'firstName'   => $order->get_shipping_first_name() ?: $order->get_billing_first_name(),
+                'surname'     => $order->get_shipping_last_name() ?: $order->get_billing_last_name(),
+                'address' => array(
+                    'street'   => $order->get_shipping_address_1() ?: $order->get_billing_address_1(),
+                    'city'     => $order->get_shipping_city() ?: $order->get_billing_city(),
+                    'zipCode'  => $order->get_meta('_wc_balikovna_branch_zip') ?: $order->get_shipping_postcode() ?: $order->get_billing_postcode(),
+                ),
+                'emailAddress' => $order->get_billing_email(),
+                'phoneNumber'  => $order->get_billing_phone(),
+            ),
+            // případně další pole podle potřeby
+        ),
+    );
+
+    // DEBUG - vlož do logu aktuální payload
+  $this->balikovna_debug_log(['payload před API call' => $data]);
+
+    $api_url     = 'https://b2b.postaonline.cz:444/restservices/ZSKService/v1/';
+    $api_token   = get_option('wc_balikovna_api_token', '');
+    $secret_key  = get_option('wc_balikovna_api_private_key', '');
+
+    $api = new CPost_API_Client($api_url, $api_token, $secret_key);
+
+    // Volání API obalené try/catch
+    try {
+        $response = $api->call('parcelService', $data);
+        $this->balikovna_debug_log(['API call odpověď' => $response]);
+    } catch (\Throwable $e) {
+        $this->balikovna_debug_log([
+            'FATAL ERROR v $api->call!' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        return array('success' => false, 'message' => 'Fatální chyba v komunikaci s API: ' . $e->getMessage());
+    }
+
+    // Zpracování výsledku
+    if (isset($response['success']) && $response['success']) {
+        // ...další zpracování...
+        return array('success' => true, 'message' => 'Štítek úspěšně vygenerován!', 'response' => $response);
+    } else {
+        $msg = isset($response['error']) ? $response['error'] : 'Neznámá chyba API při generování štítku (box)';
+        return array('success' => false, 'message' => $msg);
+    }
+}
 }
