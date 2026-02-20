@@ -421,23 +421,7 @@ jQuery(function($){
      * @return array
      */
     public function generate_label($order)
-   
-   {if (!$response['success']) {
-    // Detailní logování chyb před návratem user-friendly chyby
-    $logfile = WP_CONTENT_DIR . '/debug-balikovna-curl.log';
-    $logdata = [
-        'time' => date('c'),
-        'order_id' => method_exists($order, 'get_id') ? $order->get_id() : '',
-        'api_url' => $api_url,
-        'api_endpoint' => 'parcelService',
-        'payload' => $data,
-        'error' => isset($response['error']) ? $response['error'] : '',
-        'body' => isset($response['body']) ? $response['body'] : '',
-        // přidej další data podle potřeby
-    ];
-    file_put_contents($logfile, print_r($logdata, true) . "\n---------------------\n", FILE_APPEND);
-    return array('success' => false, 'message' => 'Chyba napojení na ČP API: ' . esc_html($response['error']));
-}
+    {
         error_log('=== WC Balíkovna: Starting label generation for order #' . $order->get_id() . ' ===');
 		
 		// --- TEMP DEBUG: dump order meta + shipping items for diagnostics ---
