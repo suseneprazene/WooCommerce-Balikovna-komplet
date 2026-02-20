@@ -421,6 +421,17 @@ jQuery(function($){
      * @param WC_Order $order
      * @return array
      */
+private function balikovna_debug_log($message) {
+    $plugin_dir = dirname(__FILE__, 2); // root folder pluginu
+    $log_file = $plugin_dir . '/balikovna-debug.log';
+    $time = date('Y-m-d H:i:s');
+    if (is_array($message) || is_object($message)) {
+        $msg = $time . " | " . print_r($message, true) . "\n";
+    } else {
+        $msg = $time . " | " . $message . "\n";
+    }
+    @file_put_contents($log_file, $msg, FILE_APPEND | LOCK_EX);
+}
 	 
 public function generate_label($order)
 {
@@ -651,8 +662,45 @@ $api_url     = 'https://b2b.postaonline.cz:444/restservices/ZSKService/v1/'; // 
 $api_token   = get_option('wc_balikovna_api_token', '');
 $secret_key  = get_option('wc_balikovna_api_private_key', '');
 
+// Inicializace API objektu a sestavení dat:
 $api = new CPost_API_Client($api_url, $api_token, $secret_key);
+// Sestavení payloadu pro API:
+$data = array(
+    // ...
+);
 
+// Nyní až debug blok:
+$this->balikovna_debug_log([
+    'stav_před_API' => [
+        'order_id' => method_exists($order, 'get_id') ? $order->get_id() : '',
+        'delivery_type' => $order->get_meta('_wc_balikovna_delivery_type'),
+        'api_url' => $api_url,
+        'data' => $data,
+    ]
+]);
+
+if (!isset($api) || !is_object($api)) {
+    $this->balikovna_debug_log('ERROR: Objekt $api není dostupný nebo není objekt!');
+    return ['success' => false, 'message' => 'API třída není inicializována.'];
+}
+if (!isset($data) || empty($data)) {
+    $this->balikovna_debug_log('ERROR: Proměnná $data není nastavena nebo je prázdná!');
+    return ['success' => false, 'message' => 'Data pro volání API nebyla sestavena.'];
+}
+
+try {
+    $this->balikovna_debug_log('ZKOUŠÍM VOLÁNÍ $api->call...');
+    $response = $api->call('parcelService', $data);
+    $this->balikovna_debug_log(['API call odpověď' => $response]);
+} catch (\Throwable $e) {
+    $this->balikovna_debug_log([
+        'FATAL ERROR v $api->call!' => $e->getMessage(),
+        'file' => $e->getFile(),
+        'line' => $e->getLine(),
+        'trace' => $e->getTraceAsString(),
+    ]);
+    return array('success' => false, 'message' => 'Fatální chyba v komunikaci s API: ' . $e->getMessage());
+}
 // Rozlišení typů zásilky
 $deliveryType = $order->get_meta('_wc_balikovna_delivery_type'); // box/adresa
 $prefix = ($deliveryType === 'box' || $deliveryType === 'balikovna') ? 'NB' : 'DR'; // DR = adresní zásilka, NB balíkovna
